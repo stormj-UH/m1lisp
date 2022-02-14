@@ -1,5 +1,10 @@
 ; For Marc Paquette's amazing documentation and introductions to LISP and ARM32 assembly, see the original 
 ; source, included in this repository.
+;
+;
+; Original Source Copyright (c) 2016 Marc Paquette, MIT licensed
+; Subsequent commits from 6907611fadb3e6dd2bd405a664d3f8275912e6f5 onward are
+; (c) 2022 Jon-Erik G. Storm, LGPL2 licensed
 
 .arch ARMv8.4
 .p2align 2	; 	Everything needs to be aligned on 32-bits/4 bytes
@@ -153,47 +158,7 @@ lispstackbottom:
 	mov pc, lr
 	ENDPROC
 
-	/*
-	________________________________________________________________________________
-
-	The mighty cons
-
-	Lisp lists are implemented as cons cells.  The cons cell is the most elegant and
-	expressive data type ever discovered in computing.  If symbols are the atoms in
-	the Lisp universe, then cons cells organize the universe into molecules,
-	galaxies, and everything in between.
-
-	A cons cell is a pair of pointers.  Incidentally, "pair" is often used as a
-	synonym for a cons cell.
-
-	Remember car and cdr, the functions that return different parts of a
-	list?  It turns out that these weird function names are based on the traditional
-	names for the pointers in the cons cell.
-
-	cons cell
-	+-----+-----+
-	| car | cdr |
-	+-----+-----+
-
-	It also turns out that stating that the car and cdr functions operate on lists
-	is true only at a superficial level.  What these functions really do is operate
-	on cons cells.  This makes implementing the car and cdr functions dead easy:
-	return the pointer to the object stored in the car or cdr part of the cell,
-	respectively.
-
-	In a cell, the car and cdr pointers may each point to another cell, a symbol, or
-	nil.
-
-	For example, here is a cell where the car points to a symbol and the cdr points
-	to nil.
-
-	+-----+-----+
-	| car | cdr ---> nil
-	+--|--+-----+
-	   |
-	   v
-	symbol
-
+	
 	For simplicity of implementation, a practical value for nil is 0.  We store
 	nothing useful at memory location 0.
 
@@ -224,27 +189,6 @@ cells:
 	.equiv cellsend, .
 
 	/*
-
-	A Lisp program can ignore its obsolete data by simply abandoning it.  From a
-	Lisp programmer's point of view, memory is infinite.  In fact, Lisp provides no
-	explicit way for a program to deallocate memory.
-
-	Side note: I know that you know that I know that limitless memory is impossible.
-	And it's easy to write a Lisp program that quickly exhausts memory.  I'm just
-	saying that limitless memory is part of the Lisp programming model.
-
-	In assembly language, memory is definitely limited.  We have to meticulously and
-	precisely manage memory usage.  When we no longer need it, we have to carefully
-	track it to reuse it later.  
-
-	So it's up to our interpreter to implement automatic memory management.  When a
-	Lisp program runs out of memory, the interpreter must look for abandoned memory
-	to reuse.  For this, McCarthy's team invented the term "garbage collection".  The
-	name stuck.
-
-	The first Lisp used mark-sweep garbage collection.  So do we because it is
-	simple to describe and implement.  Also, we limit ourselves to collect abandoned
-	cons cells.  We won't bother with abandoned symbols.
 
 	There are two ingredients to marking and sweeping: a free list and a root set.
 
@@ -1664,91 +1608,12 @@ greeting:
 	ENDPROC
 
 	/*
-
-	A Lisp environment is the current set of variable bindings with which evaluation
-	takes place.  At any given moment, the current Lisp environment comprises global
-	variables and lambda arguments.  The environment changes as a Lisp program
-	directs the interpreter to enter and exit Lisp functions.  We need a data
-	structure to handle insertion and deletion of bindings.
-
-	We use an association list, a traditional Lisp data structure.  An association
-	list is a list of pairs, in which the car of each pair is a key and the cdr its
-	value.  In our case, each key represents a symbol and each value is the value
-	bound to the symbol.
-
-	For example, this association list has three pairs that bind a, b, and c to
-	abacus, beluga, and cantilever, respectively:
-
-	((a . abacus) (b . beluga) (c . cantilever))
-
-	Given a key, is it bound? If so what is it bound to?
-
-	Here is a good time to introduce recursive functions, which is a classic Lisp
-	tool for iteration.  Don't be surprised when I state that Lisp solves iteration
-	quite elegantly.
-
-	Here's a common pattern in a Lisp function to iterate over a list:
-
-	* If the list is empty, stop and return a value indicating as much.
-
-	* Otherwise, if the first item in the list is what we're looking for, then
-	process it and return.
-
-	* Otherwise, re-apply our function to the rest of the list.
-
-	If the use of the words "first" and "rest" remind you of car and cdr, then
-	you're on the right track.
-
-	With that in mind, here's our assoc function:
-
 	(define assoc
 	  (lambda (key alist)
 	    (cond ((null alist)               nil)
 	  	  ((eq key (car (car alist))) (car alist))
 		  (t                          (assoc key (cdr alist))))))
-
-	Our assoc function searches for the key parameter in the alist parameter.  The
-	body of our assoc function is a single cond expression.  Let's examine each
-	clause in the cond:
-
-	The first clause:
-
-	((null alist)               nil)
-
-	This checks to see if our association list is empty.  An empty
-	association list means that there are no bindings, so key is obviously not bound
-	and we return nil.
-
-	The second clause:
 	
-	((eq key (car (car alist))) (car alist))
-
-	Is the key equal to the car of the car of the association list?  If they are
-	equal, then return the car of the association list, which is the binding pair.
-
-	The last clause:
-	
-	(t                          (assoc key (cdr alist)))
-
-	This clause acts as a fallback clause, guaranteeing that it will always be
-	evaluated when the test expressions of the all other clauses are false.  At this
-	point, we have not found the binding we are looking for, so we call assoc again
-	with the same key but with the cdr of the association list.  The cdr of the
-	association list excludes the car.  Thanks to the second clause, we know that
-	the car does not have a binding that matches our key parameter.
-
-	Notice how the last clause calls assoc.  This is the recursive part, which
-	re-applies assoc to the next item in the list.  If you're new to recursion, the
-	idea takes some getting used to.  Operationally, recursion in this style is the
-	same as, say, a for-each loop in conventional languages.  The advantage is that
-	you get to concentrate on the problem without the hassle of looping machinery in
-	your syntax.
-
-	Now we can implement the assoc function in assembly, specialized for a Lisp
-	environment.  For our environment we use the x9 register.  Given a key in x0 and
-	an association list (environment) in x9, return the first matching key-value
-	pair in x0.  If the key is not in the car of any pair in the list, return nil.
-
 	*/
 
 	PROC assoc
@@ -1882,137 +1747,7 @@ greeting:
 	
 	/*
 
-	________________________________________________________________________________
 
-	Evaluation
-
-	We haven't covered what exactly the E means in the REPL.  Evaluation means
-	converting an S-expression into a value. 
-
-	Get ready for it: here comes another big Lisp innovation.
-
-	In the paper where he announces Lisp, McCarthy describes the rules for
-	evaluating Lisp expressions.  To describe these rules, he presents a definition
-	of a Lisp function named eval that evaluates Lisp expressions.  It was a
-	ground-breaking feat to define a programming language in terms of itself.  It
-	was an obvious thing to do, considering Lisp's expressiveness.  It was also
-	remarkably concise. 
-
-	Computer scientists call this "self-interpreting".  A self-interpreting language
-	is astonishingly easy to extend.  Just modify its interpreter, which is the
-	definition of the language, which is the interpeter...
-
-	Steve Russell gets credit for implementing the seminal eval in IBM 704 assembly
-	language, paving the way for a real, honest to greatness Lisp interpreter.
-	Thanks to him, it was possible to interact with Lisp directly just by
-	running a Lisp program.
-
-	To implement our own eval, we follow McCarthy and Russell's lead by first
-	defining it in Lisp before implementing it in assembly.
-
-	We start with the simplest of Lisp expressions: () and t.  These are known as
-	self-evaluating expressions because they evaluate to themselves:
-
-	(define eval
-	  (lambda (expr)
-	    (cond
-	     ((selfevalp expr)      expr)
-	     (t                     (quote errbadlistexpr)))))
-
-	The selfevalp function returns true if an expression is self-evaluating, false 
-	otherwise.
-
-	(define selfevalp
-	  (lambda (x)
-	    (cond ((null x)           t)
-		  ((eq x (quote t))   t)
-		  (t                  nil))))
-
-	Side note: In Lisp, functions that return a true or false value are
-	traditionally called predicates.  A predicate often has the letter "p" appended
-	to its name. The null and atom functions are historical exceptions.
-
-	Calling our nascent eval with () or t returns each of these, respectively.
-	If it fails to recognize an expression, it returns errbadlistexpr.
-	Examples:
-
-	(eval (quote ()))
-	nil
-
-	(eval (quote t))
-	t
-
-	(eval (quote name))
-	errbadlistexpr
-
-	Next, we add nil:
-
-	(define eval
-	  (lambda (expr)
-	    (cond
-	     ((selfevalp expr)      expr)
-	     ((eq expr (quote nil)) ())
-	     (t                     (quote errbadlistexpr)))))
-	
-	(eval (quote nil))
-	nil
-
-	The next simplest expression is a symbol, which evaluates to the value it is
-	bound to.  To extend our eval to handle symbols, we introduce the env parameter
-	to specify bindings:
-
-	(define eval
-	  (lambda (expr env)
-	    (cond
-	     ((selfevalp expr)      expr)
-	     ((eq expr (quote nil)) ())
-	     ((symbolp expr)        (cdr (assoc expr env)))
-	     (t                     (quote errbadlistexpr)))))
-
-	The symbolp predicate returns true if its argument is a symbol, false
-	otherwise:
-	
-	(define symbolp
-	  (lambda (x)
-	    (cond ((atom x) (cond ((null x) nil) (t t)))
-		  (t        nil))))
-
-	Calling our new eval with an environment argument gives us access to variable
-	bindings:
-
-	(define e (quote ((B . (beluga)) (C . cantilever))))
-	(eval (quote B) e)
-	(beluga)
-
-	(eval (quote C) e)
-	cantilever
-
-	To evaluate functions, we extend our eval to handle list expressions.  At this
-	point we can safely assume that an expression is a list because previous cond
-	clauses have already checked for all possible non-list expressions.
-
-	When the car of a list expression is a symbol for a built-in function or special
-	form, evaluate the rest of the list expression accordingly.  We start with a
-	simple list expression, quote:
-
-	(define eval
-	  (lambda (expr env)
-	    (cond
-	     ((selfevalp expr)               expr)
-	     ((eq expr (quote nil))          ())
-	     ((symbolp expr)                 (cdr (assoc expr env)))
-     	     ((eq (car expr) (quote quote))  (arg1 expr))
-	     (t                              (quote errbadlistexpr)))))
-
-	The arg1 and arg2 functions return the first and second arguments of a list
-	expression, respectively:
-
-	(define arg1 (lambda (expr) (car (cdr expr))))
-	(define arg2 (lambda (expr) (car (cdr (cdr expr)))))
-
-	Other special forms and functions follow a similar pattern as quote.  Here's the
-	complete eval:
-	
 	(define eval
 	  (lambda (expr env)
 	    (cond
@@ -2034,26 +1769,6 @@ greeting:
 	     (t                              (apply
 	                                      (eval (car expr) env)
 	                                      (evlis (cdr expr) env) env)))))
-
-	This is our biggest Lisp function, so take your time to look it over.  Notice
-	that most built-in functions, like atom, evaluate their arguments by calling
-	eval.
-
-	Also notice that a lambda expression, unlike quote, returns itself entirely.
-	This is related to the last clause, which calls the apply function.  The apply
-	function handles user-defined functions.  We cover it in detail later.
-
-	Side note: Not only do we define eval in terms of itself but we conveniently
-	ignore implementing built-in functions and special forms by using the same
-	built-in functions and special forms that Lisp provides.  This chicken-and-egg
-	situation is often called "snarfing" in Lisp.  It might be confusing, but it's
-	ok here.  Remember that we are specifying our Lisp interpreter in Lisp rather
-	than defining a working version of it.  The actual implementation is in
-	assembly, which gets us outside the chicken-and-egg loop.
-
-	Another side note: Our Lisp definition of eval is an actual, working Lisp
-	interpreter.  As an exercise, enter this eval and its helper functions in the
-	arpilisp intrepreter.  Make arpilisp interpret itself!
 
 	Before eval, let's define some helper functions and macros.
 
@@ -2348,10 +2063,7 @@ greeting:
 
 	/*
 
-	Before applying a Lisp function, we need to evaluate the arguments we are
-	passing to it.
 
-	The Lisp equivalent:
 
 	(define evlis
 	  (lambda (exprs env)
@@ -2418,13 +2130,6 @@ greeting:
 	ENDPROC
 
 	/*
-
-	The other half of evaluation is the apply function.  Apply executes a lambda
-	function by evaluating each expression in a lambda body, in order, and returns
-	the value of the last expression.
-
-	Our assembly apply procedure implements these Lisp functions:
-
 	(define apply
 	  (lambda (fn args env)
 	    (cond
@@ -2625,32 +2330,4 @@ greeting:
 	it and continue in the REPL with this shell command:
 
 	cat my.lisp - | ./arpilisp
-
-	Enjoy yourself.
-
-	________________________________________________________________________________
-
-	MIT License
-
-	Copyright (c) 2016 Marc Paquette
-
-	Permission is hereby granted, free of charge, to any person obtaining a copy
-	of this software and associated documentation files (the "Software"), to deal
-	in the Software without restriction, including without limitation the rights
-	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-	copies of the Software, and to permit persons to whom the Software is
-	furnished to do so, subject to the following conditions:
-
-	The above copyright notice and this permission notice shall be included in all
-	copies or substantial portions of the Software.
-
-	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-	SOFTWARE.
-	
-	*/
 	
