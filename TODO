@@ -1,0 +1,11 @@
+Needed to covert to ARM64:
+
+* Convert illegal ARM32 instructions to ARM64
+* Find less hackish places to store state than the flags register
+
+Planned expansions:
+
+* Expand the memory available to symbols and lists greatly
+* Attempt to include symbols in the garbage collection
+* Add recognition of numbers ASCII 0x30 - 0x39
+* Implement +, -, *, \, <, <=, =, >, =>
