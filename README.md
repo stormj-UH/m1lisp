@@ -6,7 +6,7 @@ I have been fascinated by Lisps for a long time as well for similar reasons. It 
 
 If you imagine that the program counter is the space in memory where the processor is loading new "list" elements, you can also think of the processor as a kind of Lisp interpreter. Marrying those two together in one project is education and a whole lot of fun.
 
-I have read over Marc Paquettes Arpilisp several times. It's one of the best introductions to Lisps I know of. The original readme.me is included below.
+I have read over Marc Paquette's Arpilisp several times. It's one of the best introductions to Lisps I know of. The original readme.md is included below.
 
 The intent of this project is to update Arpilisp to run on ARM64 processors either on Linux or macOS, expand its memory, and implement numbers.
 
