@@ -1,546 +1,9 @@
-	/* -*- mode: asm; fill-column: 88; tab-width: 8; -*- */
+; For Marc Paquette's amazing documentation and introductions to LISP and ARM32 assembly, see the original 
+; source, included in this repository.
 
-	/*
+.arch ARMv8.4
+.p2align 2	; 	Everything needs to be aligned on 32-bits/4 bytes
 
-	Get Started with Arpilisp
-
-	Side note: if this file looks funny, use a text editor that displays a
-	fixed-width font and uses 8 spaces for tabs.
-
-	Arpilisp is the Assembled Raspberry Pi Lisp.  This tutorial uses assembly
-	language, the lowest level programming language, to implement an interpreter for
-	Lisp, the highest level language.  Arpilisp implements Lisp from scratch, with
-	no help from any libraries and minimal help from the kernel.
-
-	Before you use arpilisp, you need to build it.  To build arpilisp, you need
-	a few things:
-
-	* A Raspberry Pi running Raspbian
-
-	* That's it.
-
-	To build arpilisp, type the following in a shell:
-
-	gcc -nostdlib -o arpilisp arpilisp.s
-
-	This tells the GNU compiler (gcc) to use arpilisp.s, this file that you are
-	reading, as input, to build an executable file named arpilisp.  Later we
-	cover what the -nostdlib option does.
-
-	To use arpilisp itself, type this:
-
-	./arpilisp
-
-	To quit arpilisp, type Ctrl-D.
-
-	References
-
-	https://www.raspberrypi.org
-
-	https://www.raspbian.org
-	
-	________________________________________________________________________________
-
-	Acknowledgements
-
-	Thanks to Richard W.M. Jones, John McCarthy, and Jack W. Crenshaw for showing us
-	the simplicity and elegance hiding in complex things, and for reminding us that
-	computers are awesome.
-
-	Thanks also to Chris Hinsley and Jay Sissom for feedback.
-
-	________________________________________________________________________________
-
-	The Shortest Introduction to Lisp
-
-	Lisp is one of the oldest programming languages in computing.  John McCarthy and
-	his team implemented the first Lisp interpreter in 1960.  They wanted a
-	programming language for AI research.  Since then, he and many others discovered
-	amazing things about how Lisp can make computers do surprising, interesting
-	things.
-
-	Most people acknowledge Lisp's influence without knowing what it is exactly.
-	Others are turned off by Lisp's weirdness.  Lisp continues to influence
-	programming languages today.  It's not as inaccessible, alien, or irrelevant as
-	you might believe.
-
-	Lisp is an acronym for LISt Processor.  A list is a sequence of items.  To
-	specify a list, we start with an opening parenthesis, continue with the things
-	in the list, and end with a closing parenthesis.
-
-	For example, here's a list of ingredients for a salad:
-
-	(lettuce tomato oil vinegar)
-
-	We can use extra spaces to clarify what we type but Lisp doesn't care about
-	excessive white space between list items, as long as there is some.  And there's
-	no need to put white space around parentheses.  Here are some lists that look
-	different to us but mean the same to Lisp:
-
-	(lettuce  tomato   oil	  vinegar     )
-
-	(lettuce
-	tomato
-	oil
-	vinegar)
-
-	A list may itself also contain lists.  Here's a list that is different from our
-	previous list:
-
-	((lettuce tomato) (oil vinegar))
-
-	While it contains the same items, they are arranged into two sub-lists, the
-	first for the vegetables (lettuce tomato), the second for the dressing (oil
-	vinegar).
-
-	Here's an empty list:
-
-	()
-
-	The empty list comes up so much that Lisp has a symbol for it:
-
-	nil
-
-	A symbol is just a name that represents something.  What the symbol represents
-	depends on you, the programmer.  In our list above, lettuce, tomato, oil, and
-	vinegar are symbols for salad ingredients.  We sometimes refer to symbols as
-	atoms.  Unlike lists, atoms are not composed of parts.
-
-	In Lisp, lists and atoms are called "S-expressions".  We also use just
-	"expression" to mean the same thing.
-
-	The Processor part of LISt Processor means that we program a Lisp
-	interpreter to manipulate lists.  We manipulate lists with functions that accept
-	S-expression arguments.
-
-	Here's a cool thing about Lisp: functions are also written as S-expressions.  In
-	other words, data and programs have the same form.
-
-	Side note: A lot of people make a big deal about the interchangeability of Lisp
-	data and programs.  That's certainly remarkable and accounts for a lot of Lisp's
-	elegance and expressiveness.  The irony is that after getting used to this idea,
-	you find it odd that other programming languages don't have this feature.
-
-	To see how functions work, let's take a closer look at nil and the empty list.
-	To verify that they are the same, we enter this expression in Lisp:
-
-	(eq nil () )
-
-	The first item in the list of our expression is eq, which is a function.  A
-	function tells Lisp what needs to be done: we want to determine equality.  The
-	remaining items in the list, nil and (), specify the data that we want the eq
-	function to process.
-
-	Lisp responds with:
-
-	t
-
-	The t symobl means that the result of this expression is true; nil and () are
-	indeed equal. Using the t symbol to represent "true" is a Lisp convention, while
-	nil is the conventional value for false.
-
-	In Lisp, we say "function application" to mean applying a function to arguments.
-	In our example, we apply eq to two arguments.  The function compares them for
-	equality, then returns a "t" for true or "nil" for false.
-
-	Before Lisp applies a function to its arguments, it first evaluates each
-	argument.  For example, let's take a look at a more complicated expression:
-
-	(eq
-	  (eq nil ())
-	  (eq () nil))
-
-	In this expression, we give eq these arguments:
-
-	(eq nil ())
-
-	and
-
-	(eq () nil)
-	
-	We can't determine how to compute the value of the first eq application until we
-	know the values of its arguments.  Behind the scenes, that's what Lisp does.  If
-	we could watch the internal computation of our S-expression, we would see Lisp
-	first compute then substitute the values of the arguments.
-
-	This substitution renders our expression from this:
-
-	(eq
-	  (eq nil ())
-	  (eq () nil))
-
-	to this:
-	
-	(eq
-	  t
-	  (eq () nil))
-
-	then this:
-
-	(eq
-	  t
-	  t)
-
-	and finally:
-
-	t
-
-	Lisp evaluates expressions recursively by computing the values of the deepest
-	argument expressions before computing arguments that are higher up.
-
-	Lisp has some useful built-in functions.  An important function is quote.  It
-	takes a single argument and returns it unevaluated.
-
-	For example, when we type our salad list into Lisp:
-
-	(lettuce tomato oil vinegar)
-
-	Lisp returns an error about "lettuce" not being a function.
-
-	To make it clear that our salad list is a list and not an applicaton of the
-	lettuce function, we enter:
-
-	(quote (lettuce tomato oil vinegar))
-
-	Lisp responds with:
-
-	(lettuce tomato oil vinegar)
-
-	Lisp wouldn't be useful if we couldn't create our own functions.  To describe a
-	function, we use a lambda expression.  A lambda expression takes a list of
-	parameters then a sequence of S-expressions to evaluate.
-
-	Here's an example of a lambda function that accepts a single parameter to
-	compute its equality with nil:
-
-	(lambda (x) (eq nil x))
-
-	Each parameter in the parameter list is a symbol that represents an argument at
-	application time.  The sequence of S-expressions in the lambda may refer to
-	these parameters. In fact, it's good practice to make sure that the
-	S-expressions in a lambda refer only to the lambda parameters.
-
-	Lisp treats the last S-expression in the lambda specially.  Its value is the
-	value that the lambda returns when Lisp applies it.
-
-	In our lambda above, (x) is the list of parameters.  In this case, we have a
-	single parameter, x.  The S-expression (eq nil x) is the only expression in our
-	lambda.  It's also the last expression, so the lambda returns the value of this
-	expression when we apply the lambda.
-
-	When you enter a lambda by itself:
-
-	(lambda (x) (eq nil x))
-
-	Lisp returns the lambda, unapplied: 
-
-	(lambda (x) (eq nil x))
-
-	If we want to apply our lambda to an argument, we need to use the same form as a
-	function application:
-
-	(function argument ...)
-
-	We just need to replace function with a lambda expression.
-
-	For example, if we enter:
-
-	((lambda (x) (eq nil x))
-	  (quote (lettuce tomato oil vinegar)))
-
-	Lisp applies our lambda like a regular function application by following these
-	steps:
-
-	1. Evaluate the expressions of the arguments. 
-
-	2. Bind each evaluated argument, in the order it appears in the application, to
-	each of the parameters in the order that they appear in lambda parameter list.
-
-	3. Evaluate each expression in the lambda.  When an expression refers to a
-	parameter, Lisp evaluates it by substituting its bound value from step 2.
-
-	4. Return the value of the last expression in the lambda and unbind its
-	parameters.
-
-	In our example above, in step 1, Lisp first evaluates the lone argument:
-
-	(quote (lettuce tomato oil vinegar))
-
-	which gives:
-
-	(lettuce tomato oil vinegar)
-
-	In step 2, Lisp binds this evaluated argument to the parameter, x. 
-
-	For step 3, Lisp evaluates the lambda body, replacing occurrences of x with the
-	value it is bound to. This:
-
-	(eq nil x)
-
-	becomes:
-
-	(eq nil (lettuce tomato oil vinegar))
-
-	Our argument, (lettuce tomato oil vinegar), is not nil, so eq returns nil. Since
-	this is the only and last expression in the lambda, the lambda application
-	returns nil.  Returning nil for a non-nil argument is ironic until you remember
-	that nil means false in this case.
-	
-	The parameter bindings in a lambda application last only during the application
-	of the lambda.  In step 4, Lisp unbinds the lambda's parameters.  The x argument
-	has no value.
-
-	So entering this expression after applying our lambda:
-
-	x
-
-	gives an error about an unbound variable.
-
-	Outside of a lambda, we can bind a symbol to a value so that when you enter the
-	symbol, Lisp returns the value.  For example this expression binds "name"
-	to Valerie:
-
-	(define name (quote Valerie))
-
-	So entering this expression:
-
-	name
-
-	evaluates to what you would expect:
-	
-	Valerie
-
-	You can also change an existing binding:
-
-	(define name (quote Isabelle))
-
-	Bindings in a lambda temporarily override outside bindings.  For example:
-
-	(define name (quote James))
-
-	((lambda (name) name) (quote Rose))
-
-	returns:
-
-	Rose
-
-	Inside the lambda application, the name symbol is bound to Rose.  When the
-	lambda application returns, the previous binding to name is restored, so that
-	entering this expression:
-
-	name
-
-	returns this:
-
-	James
-
-	Of course, you can also bind a lambda to a symbol, which makes the lambda easier
-	to use if you intend to refer to it frequently.  For example, comparison with
-	nil is something we see enough that we define a handy function for it:
-
-	(define null (lambda (x) (eq x nil)))
-
-	Now comparison to nil is more convenient:
-
-	(null (quote Gus))
-
-	returns:
-
-	nil
-
-	Notice that the define function plays by different rules than a normal function.
-	Instead of evaluating its first argument, define takes it literally, as if it
-	were quoted.  Therefore by definition (ahem), define isn't a true function.  In
-	Lisp, we call this a "special form".  If you paid enough attention earlier, you
-	noticed that quote and lambda are also special forms.  Lambda doesn't evaluate
-	its list of parameters. And Lisp delays the evaluation of a lambda's expressions
-	until it applies the lambda.
-
-	Another special form is cond, which is short for "conditional".  It takes a list
-	of clauses.
-
-	(cond clause1 clause2... clauseN)
-	
-	Each clause is a list of 2 expressions:
-
-	(test result)
-	
-	If the test expression is true, then cond returns the value of the corresponding
-	result expression and stops processing subsequent clauses.  If the test is
-	false, cond proceeds to the next clause.  It continues doing so until it finds a
-	test that returns true or there are no more expressions.
-
-	For example, to evaluate this expression:
-
-	(cond
-	  ((eq name (quote Valerie))  (quote funny))
-	  ((eq name (quote James))    (quote silly))
-	  (t                          (quote goodbye)))
-
-	Lisp starts with the first clause:
-
-	((eq name (quote Valerie))  (quote funny))
-
-	which has this test expression:
-
-	(eq name (quote Valerie))
-
-	Given our most recent binding for name, this test evaluates to false.  Lisp
-	skips to the next clause:
-
-	((eq name (quote James)) (quote silly))
-
-	The test expression evaluates to true.  So Lisp evaluates the second
-	expression in this clause, which returns:
-
-	silly
-
-	which becomes the value of our cond expression.  Lisp ignores subsequent
-	clauses, so the clause:
-
-	(t (quote goodbye))
-	
-	doesn't get evaluated.
-	
-	As a matter of good habit, we always put a final clause in a cond that has t for
-	a condition clause's test.  That way we assure ourselves that a cond test
-	returns a value that we specify when all other clause tests are false.
-
-	Lisp isn't all special forms.  In fact, there are only a handful.  Most Lisp
-	built-in functions evaluate arguments normally.
-
-	For example, the most frequently-used Lisp functions are car and cdr.  For now,
-	we partly describe what they do, with full details of their awesomeness later.
-
-	The car function returns the first item in a list and cdr returns a list without
-	its first item.  Helpful synonyms for these functions are "first" and "rest",
-	respectively.
-
-	For example, let's define our salad list:
-
-	(define salad (quote (lettuce tomato oil vinegar)))
-
-	Entering this:	
-
-	(car salad)
-
-	returns this:
-
-	lettuce
-
-	And entering
-
-	(cdr salad)
-
-	returns
-
-	(tomato oil vinegar)
-
-	To pick individual items in a list, we combine car and cdr.  Entering:
-
-	(car (cdr salad))
-
-	gives us:
-
-	tomato
-
-	This expression:
-
-	(car (cdr (cdr salad)))
-
-	gives us:
-
-	oil
-
-	Note that car and cdr do not modify the list that is bound to salad.  Car
-	doesn't reduce a list to its first item, it only tells you what that first item
-	is.  Likewise, cdr doesn't remove the first item from a list, it only tells you
-	what a list is without its first item.  So after applying car and cdr to salad,
-	salad still has its most recent binding.  Entering:
-
-	salad
-
-	still gives us:
-	
-	(lettuce tomato oil vinegar)	
-
-	Functions that don't modify bindings other than their own are called "pure
-	functions", which is another way of saying that you, the Lisp user, don't have
-	to worry about unintended consequences when applying a function.  Function purity
-	is an important and useful quality in Lisp programming.
-
-	So that's most of the basics of Lisp that we implement in arpilisp.  We'll cover
-	the rest as we go.
-
-	References
-
-	McCarthy, "Recursive Functions of Symbolic Expressions and Their Computation by
-	Machine, Part I". MIT. 1960.
-
-	McCarthy, et al. "Lisp I Programmer's Manual." MIT. 1960.
-
-	________________________________________________________________________________
-
-	The Shortest Introduction to ARM Assembly Language
-
-	Today's computers have ample capacity to let us pile on layers of operating
-	systems, shells, libraries, frameworks, sandboxes, and containers.  So much that
-	we've successfully buried assembly language completely out of mind.  But the
-	machine is still there, and not as inaccessible, alien, or irrelevant as you
-	might believe.
-
-	The Raspberry Pi uses an ARM processor.  The ARM registers that we use in
-	arpilisp are 32 bits wide.  Registers r0 to r12 are general-purpose and registers
-	r13 to r15 are single-purpose, at least for our purposes.   Register r13 is the
-	stack pointer (sp), r14 is the link register (lr), and r15 the program counter
-	(pc).
-
-	An extra register, the processor status register (apsr), offers a few single-bit
-	condition flags that optionally record effects of previous instructions.
-
-	To manipulate data, like arithmetic, comparison, bit fiddling, and
-	so on, ARM requires that we use registers.  ARM has no instructions to
-	manipulate data in memory.  Before we operate on something, we first need to
-	load it from memory to a register.  In fact, we can't even directly load from or
-	store to memory.  We need to load an address into a register then use that
-	register to specify the location of a load (ldr) or store (str) operation.
-
-	Side note: Yes, loading an address before loading the contents of the address
-	seems like a chicken and egg situation.  It's not, of course.  The assembler and
-	the processor play some convenient tricks to solve this problem for us.
-
-	In GNU assembler, constants begin with a pound sign (#).  Addresses start with an
-	equal sign (=).
-
-	Labels end with a colon (:).  Labels must be unique with one exception: numeric
-	labels.  An assembly file can repeat numeric labels, which makes them handy for
-	throw-away labels in an assembly procedure.  An instruction refers to a
-	numerical label by post-fixing an "f" or "b", which refers to the matching
-	numerical label "forward" or "before" the instruction.
-
-	ARM, the company, and others specify calling conventions and ABIs, but we'll
-	ignore them to keep things simple.  Arpilisp is for learning Lisp and assembler,
-	not for conforming.
-
-	References
-
-	https://en.wikipedia.org/wiki/IBM_704
-
-	ARM Limited. "ARMv6-M Architecture Reference Manual." 2010.
-
-	________________________________________________________________________________
-
-	Targeting the Processor
-
-	Let's get started.  We begin at the foundation then go on until we get to the
-	end: a working Lisp interpreter.
-
-	We target the ARMv6 instruction set, which works with all variants of the
-	Raspberry Pi up to the Pi 3.
-
-	*/
-
-	.arch armv6
 
 	/*
 	________________________________________________________________________________
@@ -575,6 +38,9 @@
 
 	Errors
 
+;; The original code uses flags to store state, but also uses some registers.
+;; Just to keep it clean, I'm going to switch to registers.
+
 	We need a way to flag an error. We'll use the overflow (V) flag in the apsr.
 	This gives us a simple mechanism to set and detect error conditions.  Reacting
 	to an error is as simple as appending the "vs" or "vc" condition code to
@@ -586,12 +52,14 @@
 	*/
 
 	.macro ERRSET errsym
-	msr apsr_nzcvq, #1<<28
-	ldr r7, =\errsym
+;; --	msr apsr_nzcvq, #1<<28  --
+	mov x28, #1<<28
+	ldr x7, =\errsym
 	.endm
 
 	.macro ERRCLR
-	msr apsr_nzcvq, #0
+;; --	msr apsr_nzcvq, #0 --
+	xor x28, x28, #1<<28	
 	.endm
 
 	/*
@@ -606,11 +74,13 @@
 
 	*/
 	.macro ZSET
-	msr apsr_nzcvq, #1<<30
+;; --	msr apsr_nzcvq, #1<<30 --;;
+	mov x28, #1<<30
 	.endm
 	
 	.macro ZCLR
-	msr apsr_nzcvq, #0
+;; --	msr apsr_nzcvq, #0 --;;
+	xor x28, x28, #1<<30
 	.endm
 
 	/*
@@ -621,8 +91,8 @@
 	We need a safe place to store intermediate Lisp values.  We use a stack for
 	this.  We cover the idea of "safe" later on.
 
-	We reserve some memory for the Lisp stack and r6 for the Lisp stack pointer.
-	This stack pointer is separate from processor's stack pointer, aka sp, aka r13.
+	We reserve some memory for the Lisp stack and x6 for the Lisp stack pointer.
+	This stack pointer is separate from processor's stack pointer, aka sp, aka x13.
 
 	Side note: The Linux kernel conveniently sets up sp for us and reserves some
 	memory for the process stack when it launches arpilisp.
@@ -638,30 +108,31 @@ lispstackbottom:
 
 	/*
 
-	Push the Lisp value in r0 onto the Lisp stack.  Signal an error if the stack is
+	Push the Lisp value in x0 onto the Lisp stack.  Signal an error if the stack is
 	full.  Generating an error instead of panicking is fine because it lets our
 	interpreter gracefully recover from exhausted Lisp stack space.
 
 	*/
 	
 	PROC pushlisp
-	push { r1 }
-	ldr r1, =lispstackbottom
-	cmp r6, r1
+;; --	push { x1 }	-- ;;
+;; We have to replace the push instructions with either manual saving or a macro.
+	ldr x1, =lispstackbottom
+	cmp x6, x1
 	bne 10f
 	ERRSET errstackfull
 	b 999f
 
-10:	stmfd r6!, { r0 }
+10:	stmfd x6!, { x0 }
 	ERRCLR
 
-999:	pop { r1 }
+999:	pop { x1 }
 	mov pc, lr
 	ENDPROC
 
 	/*
 
-	Pop from the Lisp stack and store it in r0.  Modifies the condition flags.
+	Pop from the Lisp stack and store it in x0.  Modifies the condition flags.
 
 	Panic if we try to pop from an empty stack.  We panic instead of generating an
 	error because a pop requires a previous push.  In other words, a mismatched pop
@@ -672,13 +143,13 @@ lispstackbottom:
 
 	PROC poplisp
 
-	ldr r0, =lispstacktop
-	cmp r6, r0
+	ldr x0, =lispstacktop
+	cmp x6, x0
 	bne 10f
-	ldr r0, =panicstackempty
+	ldr x0, =panicstackempty
 	b panic
 
-10:	ldmfd r6!, { r0 }
+10:	ldmfd x6!, { x0 }
 	mov pc, lr
 	ENDPROC
 
@@ -802,21 +273,21 @@ freelist:
 
 	PROC initfreelist
 
-	push { r0-r2, lr }
-	ldr r0, =cells
-	ldr r1, =freelist		/* Free list starts at the beginning */
-	str r0, [ r1 ]			/* of the cell pool. */
+	push { x0-x2, lr }
+	ldr x0, =cells
+	ldr x1, =freelist		/* Free list starts at the beginning */
+	str x0, [ x1 ]			/* of the cell pool. */
 
-	ldr r2, =cellsend
-	sub r2, r2, #8			/* Stop before the last cell. */
+	ldr x2, =cellsend
+	sub x2, x2, #8			/* Stop before the last cell. */
 
-1:	mov r1, r0
-	add r0, r0, #8			/* The next cell. */
-	str r0, [ r1, #4 ]
-	cmp r0, r2
+1:	mov x1, x0
+	add x0, x0, #8			/* The next cell. */
+	str x0, [ x1, #4 ]
+	cmp x0, x2
 	bne 1b
 
-	pop { r0-r2, pc }
+	pop { x0-x2, pc }
 
 	ENDPROC
 
@@ -864,68 +335,68 @@ freelist:
 
 	PROC collectgarbage
 
-	push { r0, r6, lr }
+	push { x0, x6, lr }
 
 	/* Mark the root set. */
-	mov r0, r9			/* The environment. */
+	mov x0, x9			/* The environment. */
 	bl mark
-	mov r0, r8			/* The expression being evaluated. */
+	mov x0, x8			/* The expression being evaluated. */
 	bl mark
-	mov r0, r7			/* The value. */
+	mov x0, x7			/* The value. */
 	bl mark
-	mov r0, r5			/* The list of lambda argument values. */
+	mov x0, x5			/* The list of lambda argument values. */
 	bl mark
-	ldr r0, =freelist
-	ldr r0, [r0]
+	ldr x0, =freelist
+	ldr x0, [x0]
 	bl mark
 
 	/* Mark the Lisp stack. */
-10:	ldr r0, =lispstacktop	
-	cmp r6, r0
+10:	ldr x0, =lispstacktop	
+	cmp x6, x0
 	beq 20f
-	ldmfd r6!, { r0 }
+	ldmfd x6!, { x0 }
 	bl mark
 	b 10b
 
 20:	bl sweep
-	pop { r0, r6, pc }
+	pop { x0, x6, pc }
 
 	ENDPROC
 
 	/*
 
-	Given a pointer in r0, mark it if applicable.
+	Given a pointer in x0, mark it if applicable.
 
 	*/
 
 	PROC mark
 
-	push { r0-r3, lr }
+	push { x0-x3, lr }
 
-	/* Does r0 point to a cell? */
-1:	cmp r0, #NIL
+	/* Does x0 point to a cell? */
+1:	cmp x0, #NIL
 	beq 999f
-	tst r0, #SYMMASK
+	tst x0, #SYMMASK
 	bne 999f
 
 	/* Is the car already marked? */
-	ldr r1, [ r0 ]
-	tst r1, #MARKMASK
+	ldr x1, [ x0 ]
+	tst x1, #MARKMASK
 	bne 999f
 
 	/* Mark the car. */
-	mov r2, r1			/* Mark with r2, save r1. */
-	orr r2, r2, #MARKMASK
-	str r2, [r0]			/* Store the mark in car. */
+	mov x2, x1			/* Mark with x2, save x1. */
+	orr x2, x2, #MARKMASK
+	str x2, [x0]			/* Store the mark in car. */
 
 	/* Follow the data pointed to by the car and cdr. */
-	mov r3, r0			/* Save original pointer in r3. */
-	mov r0, r1			/* Chase after the car. */
+	mov x3, x0			/* Save original pointer in x3. */
+	mov x0, x1			/* Chase after the car. */
 	bl mark
-	ldr r0, [ r3, #4 ]		/* Chase after the cdr. */
+	ldr x0, [ x3, #4 ]		/* Chase after the cdr. */
 	b 1b
 
-999:	pop { r0-r3, pc }
+999:	pop { x0-x3, pc }
 	ENDPROC
 
 	/*
@@ -937,33 +408,33 @@ freelist:
 	*/
 	PROC sweep
 
-	push { r0-r1, lr }
-	ldr r1, =cells
-1:	ldr r0, [ r1 ]			/* Is the car marked? */
-	tst r0, #MARKMASK
+	push { x0-x1, lr }
+	ldr x1, =cells
+1:	ldr x0, [ x1 ]			/* Is the car marked? */
+	tst x0, #MARKMASK
 	beq 2f
 
 	/* Cell is active, unmark it. */
-	bic r0, #MARKMASK
-	str r0, [ r1 ]
+	bic x0, #MARKMASK
+	str x0, [ x1 ]
 	b 3f
 
 	/* Cell is inactive, add it to freelist. */
-2:	mov r0, #0			/* Clear the car. */
-	str r0, [ r1 ]
-	ldr r0, =freelist		/* Store freelist head in the cdr. */
-	ldr r0, [ r0 ]
-	str r0, [ r1, #4 ]
-	ldr r0, =freelist		/* Point freelist to the new head. */
-	str r1, [ r0 ]
+2:	mov x0, #0			/* Clear the car. */
+	str x0, [ x1 ]
+	ldr x0, =freelist		/* Store freelist head in the cdr. */
+	ldr x0, [ x0 ]
+	str x0, [ x1, #4 ]
+	ldr x0, =freelist		/* Point freelist to the new head. */
+	str x1, [ x0 ]
 
 	/* Next cell in the cell pool. */
-3:	ldr r0, =cellsend
-	add r1, r1, #8
-	cmp r1, r0
+3:	ldr x0, =cellsend
+	add x1, x1, #8
+	cmp x1, x0
 	bne 1b
 
-	pop { r0-r1, pc }
+	pop { x0-x1, pc }
 
 	ENDPROC
 
@@ -991,46 +462,46 @@ freelist:
 		  |		    |	
 	          +-----------------+
 	
-	Given pointers to Lisp objects in r1 and r2, return an allocated cell in r0 such
-	that its car contains r1 and cdr contains r2.  Otherwise, panic if there is no
+	Given pointers to Lisp objects in x1 and x2, return an allocated cell in x0 such
+	that its car contains x1 and cdr contains x2.  Otherwise, panic if there is no
 	memory or issue an error if the Lisp stack is full.
 
 	*/
 
 	PROC cons
 
-	push { r3-r4, lr }
-	ldr r3, =freelist		/* Is the free list empty? */
-	ldr r0, [ r3 ]
-	cmp r0, #NIL
+	push { x3-x4, lr }
+	ldr x3, =freelist		/* Is the free list empty? */
+	ldr x0, [ x3 ]
+	cmp x0, #NIL
 	bne 10f
 
 	
-	mov r0, r1
+	mov x0, x1
 	bl pushlisp
 	bvs 999f
-	mov r0, r2
+	mov x0, x2
 	bl pushlisp
 	bvs 999f
 	bl collectgarbage
 	bl poplisp
-	mov r2, r0
+	mov x2, x0
 	bl poplisp
-	mov r1, r0
+	mov x1, x0
 
-	ldr r0, [ r3 ]			/* Is the free list still empty? */
-	cmp r0, #NIL
+	ldr x0, [ x3 ]			/* Is the free list still empty? */
+	cmp x0, #NIL
 	bne 10f
 	
-	ldr r0, =panicmemfull
+	ldr x0, =panicmemfull
 	b panic
 
-10:	ldr r4, [ r0, #4 ]		/* Advance freelist. */
-	str r4, [ r3 ]
-	str r1, [ r0 ]			/* Store the car and cdr. */
-	str r2, [ r0, #4 ]
+10:	ldr x4, [ x0, #4 ]		/* Advance freelist. */
+	str x4, [ x3 ]
+	str x1, [ x0 ]			/* Store the car and cdr. */
+	str x2, [ x0, #4 ]
 	ERRCLR
-999:	pop { r3-r4, pc }
+999:	pop { x3-x4, pc }
 
 	ENDPROC
 
@@ -1216,66 +687,66 @@ internbuffer:
 
 	PROC intern
 
-	push { r0-r5, lr }
+	push { x0-x5, lr }
 
 	/* Search for the symbol in obarray. */
-	ldr r0, =obarray		/* Start of obarray. */
+	ldr x0, =obarray		/* Start of obarray. */
 
-1:	ldr r1, =obarrayend		/* At the end of obarray? */
-	ldr r1, [ r1 ]
-	cmp r0, r1
+1:	ldr x1, =obarrayend		/* At the end of obarray? */
+	ldr x1, [ x1 ]
+	cmp x0, x1
 	beq 5f
 
-	mov r1, r0
-	ldr r2, =internbufferlen
+	mov x1, x0
+	ldr x2, =internbufferlen
 
 	/* Compare print name lengths. */
-	ldr r3, [ r1 ], #4		/* Length of print name in obarray. */
-	ldr r4, [ r2 ], #4		/* Length of print name to intern. */
-	cmp r3, r4
+	ldr x3, [ x1 ], #4		/* Length of print name in obarray. */
+	ldr x4, [ x2 ], #4		/* Length of print name to intern. */
+	cmp x3, x4
 	bne 4f
 
 	/* Compare print names. */
-2:	cmp r3, #0			/* Have we compared all characters? */
+2:	cmp x3, #0			/* Have we compared all characters? */
 	beq 8f				/* Found.  Symbol already interned. */
 
-3:	ldrb r4, [ r1 ], #1
-	ldrb r5, [ r2 ], #1
-	cmp r4, r5
+3:	ldrb x4, [ x1 ], #1
+	ldrb x5, [ x2 ], #1
+	cmp x4, x5
 	bne 4f
-	sub r3, r3, #1
+	sub x3, x3, #1
 	b 2b
 
 	/* Advance to the next print name in obarray. */
-4:	ldr r1, [ r0 ]			/* Length of the current string. */
-	add r1, r1, #4			/* Advance to the first character. */
-	add r1, r1, r0			/* Add string's address. */
+4:	ldr x1, [ x0 ]			/* Length of the current string. */
+	add x1, x1, #4			/* Advance to the first character. */
+	add x1, x1, x0			/* Add string's address. */
 
 	/*
 
-	At this point, r1 is at the end of the symbol object that r0 points to.  The next
+	At this point, x1 is at the end of the symbol object that x0 points to.  The next
 	symbol object is at the next 4-byte boundary.  We need to round up to this
-	boundary by calculating how much to add to r1.  The bad news is that ARM doesn't
+	boundary by calculating how much to add to x1.  The bad news is that ARM doesn't
 	have an integer modulo instruction.  The good news is that 4 is a power of 2, so
 	bit manipulation is the obvious choice and ARM has plenty of useful
 	bit-manipulation instructions.
 
-	To calculate an offset to add to r1, we want this mapping of the least 2 bits:
+	To calculate an offset to add to x1, we want this mapping of the least 2 bits:
 
 	0b00 -> 0b00
 	0b01 -> 0b11
 	0b10 -> 0b10
 	0b11 -> 0b01
 
-	Note that for 0b00, we're already there so there's nothing to add to r1.
+	Note that for 0b00, we're already there so there's nothing to add to x1.
 
 	*/
 
-	and r0, r1, #0b11		/* Consider only the least 2 bits. */
-	rsb r0, r0, #4			/* Subtract 4. */
-	and r0, r0, #0b11		/* Keep only the least 2 bits. */
+	and x0, x1, #0b11		/* Consider only the least 2 bits. */
+	rsb x0, x0, #4			/* Subtract 4. */
+	and x0, x0, #0b11		/* Keep only the least 2 bits. */
 
-	add r0, r0, r1			/* Point r0 to next object. */
+	add x0, x0, x1			/* Point x0 to next object. */
 
 	b 1b
 
@@ -1283,52 +754,52 @@ internbuffer:
 
 	Allocate a new print name in obarray.
 
-	At this point, both r0 and r1 contain the value stored at obarrayend.  This
-	value points to our new symbol, which we return in r0.  So we preserve r0 for
+	At this point, both x0 and x1 contain the value stored at obarrayend.  This
+	value points to our new symbol, which we return in x0.  So we preserve x0 for
 	that purpose.
 
 	*/
 
-5:	ldr r3, =internbufferlen
+5:	ldr x3, =internbufferlen
 
 	/* Is there room in obarray? */
-	add r1, r1, #4			/* Add the word for the length. */
-	ldr r2, [ r3 ]
-	add r1, r1, r2			/* Add the length of the string. */
-	and r2, r1, #0b11		/* Align to the next 4-byte boundary. */
-	rsb r2, r2, #4
-	add r1, r1, r2
-	ldr r2, =OBARRAYCAP
-	cmp r1, r2
+	add x1, x1, #4			/* Add the word for the length. */
+	ldr x2, [ x3 ]
+	add x1, x1, x2			/* Add the length of the string. */
+	and x2, x1, #0b11		/* Align to the next 4-byte boundary. */
+	rsb x2, x2, #4
+	add x1, x1, x2
+	ldr x2, =OBARRAYCAP
+	cmp x1, x2
 	blt 6f
 
 	/* No more symbol room. */
-	ldr r0, =panicobarrayfull
+	ldr x0, =panicobarrayfull
 	b panic
 
 	/* Expand obarray. */
-6:	ldr r4, =obarrayend
-	str r1, [ r4 ]
+6:	ldr x4, =obarrayend
+	str x1, [ x4 ]
 
-	mov r1, r0			/* Reset r1 to our new symbol. */
+	mov x1, x0			/* Reset x1 to our new symbol. */
 
-	ldr r2, [ r3 ], #4		/* Copy the length. */
-	str r2, [ r1 ], #4
+	ldr x2, [ x3 ], #4		/* Copy the length. */
+	str x2, [ x1 ], #4
 
 	/* Copy the string. */
-7:	cmp r2, #0
+7:	cmp x2, #0
 	beq 8f
-	ldrb r4, [ r3 ], #1
-	strb r4, [ r1 ], #1
-	sub r2, r2, #1
+	ldrb x4, [ x3 ], #1
+	strb x4, [ x1 ], #1
+	sub x2, x2, #1
 	b 7b
 
 	/* Encode our pointer as a symbol. */
-8:	ldr r1, =obarray		/* Subtract obarray base. */
-	sub r7, r0, r1
-	orr r7, r7, #SYMMASK		/* Imprint the mask. */
+8:	ldr x1, =obarray		/* Subtract obarray base. */
+	sub x7, x0, x1
+	orr x7, x7, #SYMMASK		/* Imprint the mask. */
 
-	pop { r0-r5, pc }
+	pop { x0-x5, pc }
 
 	ENDPROC
 
@@ -1482,61 +953,61 @@ dotstr:
 	Most Lisp implementations provide prin1 and print functions.  The prin1
 	procedure outputs a Lisp object without a newline ending.
 
-	Given a pointer to a Lisp object in r0, output its textual representation.
+	Given a pointer to a Lisp object in x0, output its textual representation.
 
 	*/
 
 	PROC prin1
 
-	push { r0-r3, lr }
+	push { x0-x3, lr }
 
-	cmp r0, #NIL			/* Is this nil? */
+	cmp x0, #NIL			/* Is this nil? */
 	bne 1f
 
 	/* Print nil. */
-	ldr r0, =symnil
+	ldr x0, =symnil
 	b 2f
 
-1:	tst r0, #SYMMASK		/* Is this a symbol? */
+1:	tst x0, #SYMMASK		/* Is this a symbol? */
 	beq 3f
 
 	/* Print a symbol. */
-2:	bic r0, #SYMMASK
-	ldr r1, =obarray
-	add r0, r0, r1
-	add r1, r0, #4			/* Symbol string address. */
-	ldr r2, [ r0 ]			/* Symbol length. */
+2:	bic x0, #SYMMASK
+	ldr x1, =obarray
+	add x0, x0, x1
+	add x1, x0, #4			/* Symbol string address. */
+	ldr x2, [ x0 ]			/* Symbol length. */
 	bl write
 	b 999f				/* Done. */
 
 	/* Print a cell. */
-3:	ldr r1, =leftparenstr
-	ldr r2, =LEFTPARENSTRLEN
+3:	ldr x1, =leftparenstr
+	ldr x2, =LEFTPARENSTRLEN
 	bl write
 
-4:	mov r3, r0			/* Save our cell pointer. */
-	ldr r0, [r3]			/* Get the car and print it. */
+4:	mov x3, x0			/* Save our cell pointer. */
+	ldr x0, [x3]			/* Get the car and print it. */
 	bl prin1
-	ldr r0, [r3, #4]		/* Get the cdr. */
-	cmp r0, #NIL			/* Is the cdr nil? */
+	ldr x0, [x3, #4]		/* Get the cdr. */
+	cmp x0, #NIL			/* Is the cdr nil? */
 	beq 6f
-	tst r0, #SYMMASK	/* Is the cdr a symbol? */
+	tst x0, #SYMMASK	/* Is the cdr a symbol? */
 	bne 5f
-	ldr r1, =spacestr		/* Cdr is a cell, so iterate. */
-	ldr r2, =SPACESTRLEN
+	ldr x1, =spacestr		/* Cdr is a cell, so iterate. */
+	ldr x2, =SPACESTRLEN
 	bl write
 	b 4b
 
-5:	ldr r1, =dotstr			/* Cdr is a symbol, so print the dot. */
-	ldr r2, =DOTSTRLEN
+5:	ldr x1, =dotstr			/* Cdr is a symbol, so print the dot. */
+	ldr x2, =DOTSTRLEN
 	bl write
 	bl prin1			/* Print the symbol. */
 
-6:	ldr r1, =rightparenstr
-	ldr r2, =RIGHTPARENSTRLEN
+6:	ldr x1, =rightparenstr
+	ldr x2, =RIGHTPARENSTRLEN
 	bl write
 
-999:	pop { r0-r3, pc }
+999:	pop { x0-x3, pc }
 
 	ENDPROC
 
@@ -1555,11 +1026,11 @@ eolstr:
 
 	PROC terpri
 
-	push { r1, r2, lr }
-	ldr r1, =eolstr
-	ldr r2, =EOLSTRLEN
+	push { x1, x2, lr }
+	ldr x1, =eolstr
+	ldr x2, =EOLSTRLEN
 	bl write
-	pop { r1, r2, pc }
+	pop { x1, x2, pc }
 
 	ENDPROC
 
@@ -1603,19 +1074,19 @@ eolstr:
 
 	/usr/src/arch/arm/kernel/calls.S
 
-	For output, we use sys_write, specified by r7, and the standard output file, in
-	r0.  The kernel also requires that we specify the address of the buffer to write
-	from in r1 and the length of the buffer in r2.
+	For output, we use sys_write, specified by x7, and the standard output file, in
+	x0.  The kernel also requires that we specify the address of the buffer to write
+	from in x1 and the length of the buffer in x2.
 
 	*/
 
 	PROC write
 
-	push { r0, r7, lr }
-	mov r7, #4			/* sys_write */
-	mov r0, #1			/* stdout */
+	push { x0, x7, lr }
+	mov x7, #4			/* sys_write */
+	mov x0, #1			/* stdout */
 	svc #0
-	pop { r0, r7, pc }
+	pop { x0, x7, pc }
 
 	ENDPROC
 
@@ -1713,16 +1184,16 @@ lookbuffer:
 
 	PROC getchar
 
-	push { r0-r2, r7, lr }
-	ldr r1, =lookbuffer
-	mov r2, #1
-	mov r7, #3			/* sys_read */
-	mov r0, #0			/* stdin */
+	push { x0-x2, x7, lr }
+	ldr x1, =lookbuffer
+	mov x2, #1
+	mov x7, #3			/* sys_read */
+	mov x0, #0			/* stdin */
 	svc #0
-	cmp r0, #0			/* End of file? */
-	moveq r0, #EOT
-	streq r0, [ r1 ]
-	pop { r0-r2, r7, pc }
+	cmp x0, #0			/* End of file? */
+	moveq x0, #EOT
+	streq x0, [ x1 ]
+	pop { x0-x2, x7, pc }
 
 	ENDPROC
 
@@ -1744,17 +1215,17 @@ lookbuffer:
 
 	PROC issym
 	push { lr }
-	cmp r0, #'('
+	cmp x0, #'('
 	beq 20f
-	cmp r0, #')'
+	cmp x0, #')'
 	beq 20f
-	cmp r0, #'.'
+	cmp x0, #'.'
 	beq 20f
-	cmp r0, #EOT
+	cmp x0, #EOT
 	beq 20f
-	cmp r0, #'!'
+	cmp x0, #'!'
 	blt 20f
-	cmp r0, #'~'
+	cmp x0, #'~'
 	bge 20f
 	ZSET				/* A valid symbol character. */
 	b 999f
@@ -1767,17 +1238,17 @@ lookbuffer:
 
 	/*
 
-	Is the character in r0 white space?  Notice that we don't use the ZSET and
+	Is the character in x0 white space?  Notice that we don't use the ZSET and
 	ZCLR macros because the cmp instruction sets Z for us.
 
 	*/
 	PROC iswhite
 	push { lr }
-	cmp r0, #' '
+	cmp x0, #' '
 	beq 999f
-	cmp r0, #'\t'
+	cmp x0, #'\t'
 	beq 999f
-	cmp r0, #'\n'
+	cmp x0, #'\n'
 999:	pop { pc }
 	ENDPROC
 
@@ -1790,13 +1261,13 @@ lookbuffer:
 
 	PROC skipwhite
 
-	push { r0, lr }
-1:	LOOK r0
+	push { x0, lr }
+1:	LOOK x0
 	bl iswhite
 	bne 999f
 	bl getchar
 	b 1b
-99:	pop { r0, pc }
+99:	pop { x0, pc }
 
 	ENDPROC
 
@@ -1805,24 +1276,24 @@ lookbuffer:
 	Now we're ready to read S-expressions. We use the same syntax rules that we
 	use for output.
 
-	Note how we save and restore r6, the Lisp stack pointer.  We do this to simplify
+	Note how we save and restore x6, the Lisp stack pointer.  We do this to simplify
 	error handling; instead of being careful about unwinding the Lisp stack to handle
-	an error, we just reset r6 to its starting point.
+	an error, we just reset x6 to its starting point.
 
-	Also notice how read is a wrapper. It does nothing but save r6 then call read1,
+	Also notice how read is a wrapper. It does nothing but save x6 then call read1,
 	which does the heavy lifting.  The reason is because of lists: a list may
 	contain symbols, nil, and other lists.  To implement this definition, we need a
 	procedure that can call itself, read1.
 
-	Read an S-expression, returning a pointer to it in r7.
+	Read an S-expression, returning a pointer to it in x7.
 
 	*/
 
 	PROC read
 
-	push { r6, lr }
+	push { x6, lr }
 	bl read1
-	pop { r6, pc }
+	pop { x6, pc }
 
 	ENDPROC
 
@@ -1833,29 +1304,29 @@ lookbuffer:
 	*/
 	PROC read1
 
-	push { r0, lr }
+	push { x0, lr }
 	bl skipwhite
-	LOOK r0
+	LOOK x0
 
 	/* End of file.  Return to the OS. */
-	cmp r0, #EOT
+	cmp x0, #EOT
 	beq finish
 
 	/* We aren't ready for a dot here. */
-	cmp r0, #'.'
+	cmp x0, #'.'
 	bne 1f
 	bl getchar			/* Eat the dot. */
 	ERRSET errdot
 	b 999f
 
 	/* We aren't ready to close parenthesis either. */
-1:	cmp r0, #')'
+1:	cmp x0, #')'
 	bne 2f
 	bl getchar			/* Eat the closing parenthesis. */
 	ERRSET errparen
 	b 999f
 
-2:	cmp r0, #'('			/* Read a cell? */
+2:	cmp x0, #'('			/* Read a cell? */
 	bne 3f
 	bl readcell
 	bvs 999f
@@ -1870,13 +1341,13 @@ lookbuffer:
 	bvs 999f
 	
 990:	ERRCLR
-999:	pop { r0, pc }
+999:	pop { x0, pc }
 
 	ENDPROC
 
 	/*
 
-	Read a cell, returning a pointer to it in r7.
+	Read a cell, returning a pointer to it in x7.
 
 	Remember that our print rule for cell-contents may contain a car, which is a
 	pointer, which may refer to a cell.  This mutual recursion means we allow an
@@ -1887,14 +1358,14 @@ lookbuffer:
 
 	PROC readcell
 
-	push { r0-r3, lr }
+	push { x0-x3, lr }
 	bl getchar			/* Eat the opening parenthesis. */
 	bl skipwhite
 
-	LOOK r0				/* Immediate closing parenthesis? */
-	cmp r0, #')'
+	LOOK x0				/* Immediate closing parenthesis? */
+	cmp x0, #')'
 	bne 5f
-	mov r7, #NIL
+	mov x7, #NIL
 	b 990f
 
 	/* Read the first object in our list. */
@@ -1902,48 +1373,48 @@ lookbuffer:
 	bvs 999f
 
 	/* Construct a list comprising only of a pointer to our first object. */
-	mov r1, r7
-	mov r2, #NIL
+	mov x1, x7
+	mov x2, #NIL
 	bl cons
-	mov r7, r0
- 	add r3, r0, #4			/* Point to the cdr of our list. */
+	mov x7, x0
+ 	add x3, x0, #4			/* Point to the cdr of our list. */
 
 10:	bl skipwhite			/* Are we at the end of our list? */
-	LOOK r0
-	cmp r0, #')'
+	LOOK x0
+	cmp x0, #')'
 	beq 990f
 
- 	cmp r0, #'.'			/* Are we at a dot? */
+ 	cmp x0, #'.'			/* Are we at a dot? */
  	beq 30f
 
-20:	mov r0, r7			/* Read the next object in our list. */
+20:	mov x0, x7			/* Read the next object in our list. */
 	bl pushlisp
 	bvs 999f
 	bl read1
 	bvs 999f
 
-	mov r1, r7			/* Append the object's pointer to our list. */
-	mov r2, #NIL
+	mov x1, x7			/* Append the object's pointer to our list. */
+	mov x2, #NIL
 	bl cons
-	str r0, [ r3 ]			/* Point the cdr to the new cons. */
- 	add r3, r0, #4			/* Point to the cdr of our extended list. */
+	str x0, [ x3 ]			/* Point the cdr to the new cons. */
+ 	add x3, x0, #4			/* Point to the cdr of our extended list. */
 	bl poplisp
-	mov r7, r0
+	mov x7, x0
 	b 10b
 
 30:	bl getchar			/* Eat the dot. */
-	mov r0, r7
+	mov x0, x7
 	bl pushlisp
 	bvs 999f
 	bl read1			/* Read the cdr. */
 	bvs 999f
-	str r7, [ r3 ]			/* Store the cdr. */
+	str x7, [ x3 ]			/* Store the cdr. */
 	bl poplisp
-	mov r7, r0
+	mov x7, x0
 
 	bl skipwhite		 	/* Expect a closing parenthesis. */
-	LOOK r0
-	cmp r0, #')'
+	LOOK x0
+	cmp x0, #')'
 	beq 990f
 
 	ERRSET errparenmissing
@@ -1951,40 +1422,40 @@ lookbuffer:
 
 990:	bl getchar			/* Eat the closing parenthesis. */
 	ERRCLR
-999:	pop { r0-r3, pc }
+999:	pop { x0-x3, pc }
 
 	ENDPROC
 
 	/*
 
-	Read a symbol starting with the character in r0, returning a pointer to the
-	symbol in r7.
+	Read a symbol starting with the character in x0, returning a pointer to the
+	symbol in x7.
 
-	This procedure assumes that, on entry, the character in r0 has been validated by
+	This procedure assumes that, on entry, the character in x0 has been validated by
 	issym.
 
 	*/
 	PROC readsym
 
-	push { r0-r2, lr }
-	mov r1, #0			/* Number of characters in the symbol. */
-	ldr r2, =internbuffer
-1:	cmp r1, #INTERNMAX		/* A symbol can be longer than */
+	push { x0-x2, lr }
+	mov x1, #0			/* Number of characters in the symbol. */
+	ldr x2, =internbuffer
+1:	cmp x1, #INTERNMAX		/* A symbol can be longer than */
 	bge 2f				/* INTERNMAX but we only recognize */
-	strb r0, [ r2 ]			/* the first INTERNMAX characters. */
-	add r2, r2, #1
-	add r1, r1, #1
+	strb x0, [ x2 ]			/* the first INTERNMAX characters. */
+	add x2, x2, #1
+	add x1, x1, #1
 2:	bl getchar
-	LOOK r0
+	LOOK x0
 	bl iswhite
 	beq 3f
-	cmp r0, #'('
+	cmp x0, #'('
 	beq 3f
-	cmp r0, #')'
+	cmp x0, #')'
 	beq 3f
-	cmp r0, #'.'
+	cmp x0, #'.'
 	beq 3f
-	cmp r0, #EOT
+	cmp x0, #EOT
 	beq 990f
 
 	bl issym
@@ -1994,13 +1465,13 @@ lookbuffer:
 	ERRSET errbadsym
 	b 999f
 	
-3:	ldr r2, =internbufferlen	/* Finished reading.  Store the length. */
-	str r1, [ r2 ]
+3:	ldr x2, =internbufferlen	/* Finished reading.  Store the length. */
+	str x1, [ x2 ]
 	bl intern
 
 990:	ERRCLR
 
-999:	pop { r0-r2, pc }
+999:	pop { x0-x2, pc }
 
 	ENDPROC
 
@@ -2016,8 +1487,8 @@ lookbuffer:
 
 	PROC _start
 
-	ldr r1, =greeting
-	ldr r2, =GREETINGLEN
+	ldr x1, =greeting
+	ldr x2, =GREETINGLEN
 	bl write
 	bl initfreelist
 	b repl
@@ -2041,8 +1512,8 @@ greeting:
 
 	PROC finish
 
-	mov r7, #1			/* sys_exit */
-	mov r0, #0			/* Exit status. */
+	mov x7, #1			/* sys_exit */
+	mov x0, #0			/* Exit status. */
 	svc #0				/* Call the system. */
 
 	ENDPROC
@@ -2050,7 +1521,7 @@ greeting:
 	/*
 
 	Panic when we reach an error condition that we can't recover from.  Print the
-	symbol in r0 and return to the OS.
+	symbol in x0 and return to the OS.
 
 	*/
 
@@ -2092,17 +1563,17 @@ greeting:
 
 	PROC repl
 
-	mov r9, #NIL			/* Start with an empty environment. */
+	mov x9, #NIL			/* Start with an empty environment. */
 
 	/* Reset the Lisp registers and Lisp stack. */
-10:	ldr r6, =lispstacktop		/* Empty the Lisp stack. */
-	mov r8, #NIL			/* The S-expression to evaluate. */
-	mov r7, #NIL			/* The value of the evaluated expression. */
-	mov r5, #NIL			/* The list of lambda argument values. */
+10:	ldr x6, =lispstacktop		/* Empty the Lisp stack. */
+	mov x8, #NIL			/* The S-expression to evaluate. */
+	mov x7, #NIL			/* The value of the evaluated expression. */
+	mov x5, #NIL			/* The list of lambda argument values. */
 
 	bl read
 	bvs 30f
-	mov r8, r7
+	mov x8, x7
 	bl isdef
 	bne 15f
 	bl defsym
@@ -2111,14 +1582,14 @@ greeting:
 	
 15:	bl eval
 	bvs 30f
-	mov r0, r7
+	mov x0, x7
 	bl print
 	b 10b
 
 	/* Print an error. */
-30:	mov r0, r7
+30:	mov x0, x7
 	bl prin1
-	mov r0, r8
+	mov x0, x8
 	bl print
 	b 10b
 
@@ -2135,9 +1606,9 @@ greeting:
 	PROC atom
 	push { lr }
 
-	cmp r0, #NIL
+	cmp x0, #NIL
 	beq 990f
-	tst r0, #SYMMASK
+	tst x0, #SYMMASK
 	bne 990f
 
 	ZCLR				/* Not an atom. */
@@ -2153,7 +1624,7 @@ greeting:
 	Car and cdr are simple in concept, but we implement versions that do some error
 	checking.
 
-	Return the car of r0 in r0.  If r0 is nil, return nil.  Otherwise, generate an
+	Return the car of x0 in x0.  If x0 is nil, return nil.  Otherwise, generate an
 	error.
 
 	*/
@@ -2161,14 +1632,14 @@ greeting:
 	PROC car
 
 	push { lr }
-	tst r0, #SYMMASK
+	tst x0, #SYMMASK
 	beq 1f
 	ERRSET errcellornil
 	b 999f
 
-1:	cmp r0, #NIL
+1:	cmp x0, #NIL
 	beq 999f
-	ldr r0, [ r0 ]
+	ldr x0, [ x0 ]
 	ERRCLR
 
 999:	pop { pc }
@@ -2178,14 +1649,14 @@ greeting:
 	PROC cdr
 
 	push { lr }
-	tst r0, #SYMMASK
+	tst x0, #SYMMASK
 	beq 1f
 	ERRSET errcellornil
 	b 999f
 
-1:	cmp r0, #NIL
+1:	cmp x0, #NIL
 	beq 999f
-	ldr r0, [ r0, #4 ]
+	ldr x0, [ x0, #4 ]
 	ERRCLR
 
 999:	pop { pc }
@@ -2274,72 +1745,72 @@ greeting:
 	your syntax.
 
 	Now we can implement the assoc function in assembly, specialized for a Lisp
-	environment.  For our environment we use the r9 register.  Given a key in r0 and
-	an association list (environment) in r9, return the first matching key-value
-	pair in r0.  If the key is not in the car of any pair in the list, return nil.
+	environment.  For our environment we use the x9 register.  Given a key in x0 and
+	an association list (environment) in x9, return the first matching key-value
+	pair in x0.  If the key is not in the car of any pair in the list, return nil.
 
 	*/
 
 	PROC assoc
 
-	push { r1-r2, lr }
-	mov r1, r0			/* The key to search for. */
-	mov r2, r9			/* Association list. */
+	push { x1-x2, lr }
+	mov x1, x0			/* The key to search for. */
+	mov x2, x9			/* Association list. */
 
-1:	cmp r2, #NIL			/* At the end of the list? */
+1:	cmp x2, #NIL			/* At the end of the list? */
 	bne 2f
-	mov r0, #NIL
+	mov x0, #NIL
 	b 999f
 
-2:	mov r0, r2			/* Does the key match this pair? */
+2:	mov x0, x2			/* Does the key match this pair? */
 	bl car
 	bl car
-	cmp r1, r0
+	cmp x1, x0
 	bne 3f
-	mov r0, r2
+	mov x0, x2
 	bl car
 	b 999f
 
-3:	mov r0, r2			/* No match, try the next pair. */
+3:	mov x0, x2			/* No match, try the next pair. */
 	bl cdr
-	mov r2, r0
+	mov x2, x0
 	b 1b
 
-999:	pop { r1-r2, pc }
+999:	pop { x1-x2, pc }
 
 	ENDPROC
 
 
 	/*
 
-	Determine if the expression pointed to by r8 is a define expression.  If so,
-	then set the Z flag, return the symbol to define in r0, and return the
-	expression to evaluate in r8.  If not, then clear the status registers.
+	Determine if the expression pointed to by x8 is a define expression.  If so,
+	then set the Z flag, return the symbol to define in x0, and return the
+	expression to evaluate in x8.  If not, then clear the status registers.
 
 	*/
 	PROC isdef
 
-	push { r1-r2, lr }
+	push { x1-x2, lr }
 
-	mov r2, r0			/* Save r0. */
+	mov x2, x0			/* Save x0. */
 
-	mov r0, r8
+	mov x0, x8
 	bl atom
 	beq 990f
 	
 	bl car
-	ldr r1, =symdefine
-	cmp r0, r1
+	ldr x1, =symdefine
+	cmp x0, x1
 	bne 990f
 	
-	mov r0, r8			/* Get the symbol to bind. */
+	mov x0, x8			/* Get the symbol to bind. */
 	bl cdr
 	bvs 990
 	bl car
 	bvs 990
-	mov r1, r0			/* Remember the symbol to bind. */
+	mov x1, x0			/* Remember the symbol to bind. */
 	
-	mov r0, r8			/* Get the expression to evaluate. */
+	mov x0, x8			/* Get the expression to evaluate. */
 	bl cdr
 	bvs 990
 	bl cdr
@@ -2347,15 +1818,15 @@ greeting:
 	bl car
 	bvs 990
 	bvs 990f
-	mov r8, r0
-	mov r0, r1
+	mov x8, x0
+	mov x0, x1
 	ZSET				/* We have a define expression. */
 	b 999f
 	
 990:	ZCLR				/* Not a define expression. */
-	mov r0, r2			/* Restore r0. */
+	mov x0, x2			/* Restore x0. */
 	
-999:	pop { r1-r2, pc }
+999:	pop { x1-x2, pc }
 	ENDPROC
 	
 	/*
@@ -2363,47 +1834,47 @@ greeting:
 	The define function extends or modifies the environment.  It takes 2 arguments:
 	a symbol and an expression to evaluate and bind to the symbol.
 
-	Given a symbol in r0 and an expression in r7, and an environment in r9, evaluate
+	Given a symbol in x0 and an expression in x7, and an environment in x9, evaluate
 	the expression then create a binding in the environment.
 
-	In the case of an error, store the offending expression in r8.
+	In the case of an error, store the offending expression in x8.
 
 	*/
 
 	PROC defsym
 
-	push { r0-r2, lr }
+	push { x0-x2, lr }
 
-	tst r0, #SYMMASK
+	tst x0, #SYMMASK
 	bne 5f
-	mov r8, r0
+	mov x8, x0
 	ERRSET errbindsym
 	b 999f
 
 5:	bl eval
 	bvs 999f
 	
-	mov r2, r0			/* Remember our symbol. */
+	mov x2, x0			/* Remember our symbol. */
 
 10:	bl assoc
-	cmp r0, #NIL
+	cmp x0, #NIL
 	bne 20f
 
 	/* Symbol is unbound, so bind it. */
-	mov r1, r2
-	mov r2, r7
+	mov x1, x2
+	mov x2, x7
 	bl cons
-	mov r1, r0
-	mov r2, r9
+	mov x1, x0
+	mov x2, x9
 	bl cons
-	mov r9, r0
+	mov x9, x0
 	b 990f
 
 	/* Symbol is defined, change its value. */
-20:	str r7, [ r0, #4 ]		/* Store it in the cdr. */
+20:	str x7, [ x0, #4 ]		/* Store it in the cdr. */
 
 990:	ERRCLR
-999:	pop { r0-r2, pc }
+999:	pop { x0-x2, pc }
 
 	ENDPROC
 
@@ -2589,83 +2060,83 @@ greeting:
 	*/
 
 	.macro MATCHFORM sym
-	mov r0, r8
+	mov x0, x8
 	bl car
-	ldr r1, =\sym
-	cmp r0, r1
+	ldr x1, =\sym
+	cmp x0, x1
 	.endm
 
 	.macro ARG1
-	mov r0, r8
+	mov x0, x8
 	bl cdr
 	blvc car
 	.endm
 
 	.macro ARG2
-	mov r0, r8
+	mov x0, x8
 	bl cdr
 	blvc cdr
 	blvc car
 	.endm
 	
 	PROC selfevalp
-	push { r1, lr }
+	push { x1, lr }
 
-	cmp r0, #NIL
+	cmp x0, #NIL
 	beq 999f
 
-	ldr r1, =symt
-	cmp r0, r1
+	ldr x1, =symt
+	cmp x0, x1
 	
-999:	pop { r1, pc }
+999:	pop { x1, pc }
 	ENDPROC
 	
 	/*
 
-	Our ARM assembly eval takes an expression in r8 and an environment in r9,
-	returning a value in r7.
+	Our ARM assembly eval takes an expression in x8 and an environment in x9,
+	returning a value in x7.
 
-	When we encounter an error, we try to leave the offending expression in r8.
-	That means we don't pop r8 from the Lisp stack.  We can get away with this
+	When we encounter an error, we try to leave the offending expression in x8.
+	That means we don't pop x8 from the Lisp stack.  We can get away with this
 	imbalanced push-pop because our REPL resets the Lisp stack for us.
 
 	*/
 
 	PROC eval
-	push { r0-r2, lr }
+	push { x0-x2, lr }
 
-	mov r0, r5
+	mov x0, x5
 	bl pushlisp
 	bvs 999f
-	mov r0, r8
+	mov x0, x8
 	bl pushlisp
 	bvs 999f
 
 	// ((selfevalp expr) expr)
 	bl selfevalp
 	bne 10f
-	mov r7, r8
+	mov x7, x8
 	b 990f
 
 	// ((eq expr (quote nil)) ())
-10:	ldr r1, =symnil
-	cmp r0, r1
+10:	ldr x1, =symnil
+	cmp x0, x1
 	bne 20f
-	mov r7, #NIL
+	mov x7, #NIL
 	b 990f
 
 	// ((symbolp expr) (cdr (assoc expr env)))
-20:	tst r0, #SYMMASK
+20:	tst x0, #SYMMASK
 	beq 40f
 	bl assoc
-	cmp r0, #NIL
+	cmp x0, #NIL
 	bne 30f
 	ERRSET errunboundvar
 	b 999f
 	
 30:	bl cdr
 	bvs 999f
-	mov r7, r0
+	mov x7, x0
 	b 990f
 
 40:	// ((eq (car expr) (quote quote)) (arg1 expr))
@@ -2673,13 +2144,13 @@ greeting:
 	bne 50f
 	ARG1
 	bvs 999f
-	mov r7, r0
+	mov x7, x0
 	b 990f
 
 50:	// ((eq (car expr) (quote lambda)) expr)
 	MATCHFORM symlambda
 	bne 60f
-	mov r7, r8
+	mov x7, x8
 	b 990f
 
 	// ((eq (car expr) (quote atom))   (atom (eval (arg1 expr) env)))
@@ -2687,13 +2158,13 @@ greeting:
 	bne 70f
 	ARG1
 	bvs 999f
-	mov r8, r0
+	mov x8, x0
 	bl eval
 	bvs 999f
-	mov r0, r7
+	mov x0, x7
 	bl atom
-	ldreq r7, =symt
-	movne r7, #NIL
+	ldreq x7, =symt
+	movne x7, #NIL
 	b 990f
 
 	// ((eq (car expr) (quote car))    (car (eval (arg1 expr) env)))
@@ -2701,13 +2172,13 @@ greeting:
 	bne 80f
 	ARG1
 	bvs 999f
-	mov r8, r0
+	mov x8, x0
 	bl eval
 	bvs 999f
-	mov r0, r7
+	mov x0, x7
 	bl car
 	bvs 999f
-	mov r7, r0
+	mov x7, x0
 	b 990f
 	
 	// ((eq (car expr) (quote cdr))    (cdr (eval (arg1 expr) env)))
@@ -2715,13 +2186,13 @@ greeting:
 	bne 90f
 	ARG1
 	bvs 999f
-	mov r8, r0
+	mov x8, x0
 	bl eval
 	bvs 999f
-	mov r0, r7
+	mov x0, x7
 	bl cdr
 	bvs 999f
-	mov r7, r0
+	mov x7, x0
 	b 990f
 
 	// ((eq (car expr) (quote eq))     (eq
@@ -2731,21 +2202,21 @@ greeting:
 	bne 100f
 	ARG1
 	bvs 999f
-	mov r1, r0			/* Unevaluated 1st argument. */
+	mov x1, x0			/* Unevaluated 1st argument. */
 	ARG2
 	bvs 999f
-	mov r2, r0			/* Unevaluated 2nd argument. */
-	mov r8, r1			/* Evaluate 1st argument. */
+	mov x2, x0			/* Unevaluated 2nd argument. */
+	mov x8, x1			/* Evaluate 1st argument. */
 	bl eval
 	bvs 999f
-	mov r1, r7
-	mov r8, r2			/* Evaluate 2nd argument. */
+	mov x1, x7
+	mov x8, x2			/* Evaluate 2nd argument. */
 	bl eval
 	bvs 999f
-	mov r2, r7
-	cmp r1, r2
-	movne r7, #NIL
-	ldreq r7, =symt
+	mov x2, x7
+	cmp x1, x2
+	movne x7, #NIL
+	ldreq x7, =symt
 	b 990f
 
 	// ((eq (car expr) (quote cons))     (cons
@@ -2755,26 +2226,26 @@ greeting:
 	bne 110f
 	ARG1
 	bvs 999f
-	mov r1, r0			/* Unevaluated 1st argument. */
+	mov x1, x0			/* Unevaluated 1st argument. */
 	ARG2
 	bvs 999f
-	mov r2, r0			/* Unevaluated 2nd argument. */
-	mov r8, r1			/* Evaluate 1st argument. */
+	mov x2, x0			/* Unevaluated 2nd argument. */
+	mov x8, x1			/* Evaluate 1st argument. */
 	bl eval
 	bvs 999f
-	mov r1, r7
-	mov r8, r2			/* Evaluate 2nd argument. */
+	mov x1, x7
+	mov x8, x2			/* Evaluate 2nd argument. */
 	bl eval
 	bvs 999f
-	mov r2, r7
+	mov x2, x7
 	bl cons
-	mov r7, r0
+	mov x7, x0
 	b 990f
 
 	// ((eq (car expr) (quote cond))   (evalcond (cdr expr) env))
 110:	MATCHFORM symcond
 	bne 120f
-	mov r0, r8
+	mov x0, x8
 	bl cdr
 	bvs 999f
 	bl evalcond
@@ -2782,36 +2253,36 @@ greeting:
 	b 990f
 
 	// (t (apply (eval (car expr) env) (evlis (cdr expr) env) env)))))
-120:	mov r0, r8
+120:	mov x0, x8
 	bl car
 	bvs 999f
-	mov r1, r0			/* Unevaluated function. */
+	mov x1, x0			/* Unevaluated function. */
 
-	mov r0, r8
+	mov x0, x8
 	bl cdr
 	bvs 999f
-	mov r2, r0			/* Unevaluated arguments. */
+	mov x2, x0			/* Unevaluated arguments. */
 
-	mov r8, r1
+	mov x8, x1
 	bl eval
 	bvs 999f
-	mov r1, r7			/* Evaluated function. */
+	mov x1, x7			/* Evaluated function. */
 
-	mov r0, r2
+	mov x0, x2
 	bl evlis
 	bvs 999f
 	
-	mov r0, r1
+	mov x0, x1
 	bl apply
 	bvs 999f
 
 990:	bl poplisp
-	mov r8, r0
+	mov x8, x0
 	bl poplisp
-	mov r5, r0
+	mov x5, x0
 	ERRCLR
 	
-999:	pop { r0-r2, pc }
+999:	pop { x0-x2, pc }
 	ENDPROC
 
 	/*
@@ -2826,52 +2297,52 @@ greeting:
 		((eval (car (car c)) env) (eval (car (cdr (car c))) env))
 		(t (evalcond (cdr c) env)))))
 
-	Given a list of cond clauses in r0, return the value of the first clause that
-	tests true in r7.
+	Given a list of cond clauses in x0, return the value of the first clause that
+	tests true in x7.
 
 	*/
 
 	PROC evalcond
 
-	push { r0-r1, r8, lr }
+	push { x0-x1, x8, lr }
 
-	mov r1, r0
+	mov x1, x0
 
 	// ((eq c nil) nil)
-10:	cmp r0, #NIL
-	moveq r7, r0
+10:	cmp x0, #NIL
+	moveq x7, x0
 	beq 990f
 
 	// ((eval (caar c) env) ...
 	bl car
 	blvc car
-	mov r8, r0
+	mov x8, x0
 	bl eval
 	bvs 999f
-	cmp r7, #NIL
+	cmp x7, #NIL
 	beq 20f
 
 	// ... (eval (cadar c) env))
-	mov r0, r1
+	mov x0, x1
 	bl car
 	blvc cdr
 	blvc car
 	bvs 999f
-	mov r8, r0
+	mov x8, x0
 	bl eval
 	bvs 999f
 	b 990f
 
 	// (t (evalcond (cdr c) env))))
-20:	mov r0, r1
+20:	mov x0, x1
 	bl cdr
 	bvs 999f
-	mov r1, r0
+	mov x1, x0
 	b 10b
 
 
 990:	ERRCLR
-999:	pop { r0-r1, r8, pc }
+999:	pop { x0-x1, x8, pc }
 
 	ENDPROC
 
@@ -2889,60 +2360,60 @@ greeting:
 	               (eval (car exprs) env)
 	               (evlis (cdr exprs) env))))))
 
-	Given a list of unevaluated expressions in r0 and an environment pointed to by
-	r9, return a corresponding list of evaluated values in r5. The evaluated values
+	Given a list of unevaluated expressions in x0 and an environment pointed to by
+	x9, return a corresponding list of evaluated values in x5. The evaluated values
 	are in the same order as the values in the unevaluated list.
 
 	*/
 
 	PROC evlis
 
-	push { r0-r4, r8, lr }
+	push { x0-x4, x8, lr }
 
-	mov r5, #NIL			/* Head of the values list. */
-	mov r3, #NIL			/* End of the values list. */
-	mov r4, r0			/* Remaining unevaluated expressions. */
+	mov x5, #NIL			/* Head of the values list. */
+	mov x3, #NIL			/* End of the values list. */
+	mov x4, x0			/* Remaining unevaluated expressions. */
 
-	cmp r0, #NIL			/* Any expressions? */
+	cmp x0, #NIL			/* Any expressions? */
 	beq 990f
 
 	bl car				/* Evaluate the first expression. */
-	mov r8, r0
+	mov x8, x0
 	bl eval
 	bvs 999f
 
-	mov r1, r7 			/* Start our list of values. */
-	mov r2, #NIL
+	mov x1, x7 			/* Start our list of values. */
+	mov x2, #NIL
 	bl cons
-	mov r5, r0
-	mov r3, r0
-	mov r0, r4
+	mov x5, x0
+	mov x3, x0
+	mov x0, x4
 	bl cdr
-	mov r4, r0
+	mov x4, x0
 
-10:	cmp r0, #NIL			/* Any more expressions? */
+10:	cmp x0, #NIL			/* Any more expressions? */
 	beq 990f
 
 	bl car
 	bvs 999f
-	mov r8, r0
+	mov x8, x0
 	bl eval
 	bvs 999f
 
-	mov r1, r7
-	mov r2, #NIL
+	mov x1, x7
+	mov x2, #NIL
 	bl cons
-	str r0, [ r3, #4 ]
-	mov r3, r0
+	str x0, [ x3, #4 ]
+	mov x3, x0
 
-	mov r0, r4
+	mov x0, x4
 	bl cdr
-	mov r4, r0
+	mov x4, x0
 
 	b 10b
 
 990:	ERRCLR
-999:	pop { r0-r4, r8, pc }
+999:	pop { x0-x4, x8, pc }
 
 	ENDPROC
 
@@ -2978,69 +2449,69 @@ greeting:
 
 	Assembly language offers almost nothing beyond the ability to store things in
 	global variables.  This happens to be beneficial here, letting us take a more
-	direct route to implement the logic of apply.  In our case, we have r7, which
+	direct route to implement the logic of apply.  In our case, we have x7, which
 	contains the value of the most recently evaluated expression.
 
 	For what it's worth, a more sophisticated Lisp would allow us to define a much
 	shorter, single-function apply.
 
-	Given a lambda in r0, a list of values in r5, and an environment in r9, bind
+	Given a lambda in x0, a list of values in x5, and an environment in x9, bind
 	each lambda argument to its value then evaluate each of the expressions in the
-	lambda body, returning the value of the last expression in r7.  If the body is
+	lambda body, returning the value of the last expression in x7.  If the body is
 	empty, return nil.
 
-	We need to be careful about r9, our environment.  If there's an error during the
-	evaluation of the lambda body, we need to restore r9 to the pre-apply
+	We need to be careful about x9, our environment.  If there's an error during the
+	evaluation of the lambda body, we need to restore x9 to the pre-apply
 	environment.
 
 	*/
 
 	PROC apply
 
-	push { r0-r2, r8-r9, lr }
+	push { x0-x2, x8-x9, lr }
 
-	mov r2, r0			/* Remember our function. */
+	mov x2, x0			/* Remember our function. */
 
 	/* Make sure we have a lambda. */
 	bl car
 	bvs 980f
 	
-	ldr r1, =symlambda
-	cmp r0, r1
+	ldr x1, =symlambda
+	cmp x0, x1
 	bne 980f
 
-	mov r7, #NIL			/* Assume an empty body. */
+	mov x7, #NIL			/* Assume an empty body. */
 
-	mov r0, r2
+	mov x0, x2
 	bl cdr				/* Skip the lambda symbol. */
 
-	mov r2, r0			/* Bind the parameters. */
+	mov x2, x0			/* Bind the parameters. */
 	bl car
 	bl pairlis
 	bvs 999f
 
-	mov r0, r2			/* Skip the parameter list. */
+	mov x0, x2			/* Skip the parameter list. */
 	bl cdr
-	mov r2, r0
+	mov x2, x0
 
 	/* Apply the body. */
-10:	cmp r0, #NIL			/* Any more expressions? */
+10:	cmp x0, #NIL			/* Any more expressions? */
 	beq 990f
 	bl car				/* Evaluate the next expression. */
 	bvs 999f
-	mov r8, r0
+	mov x8, x0
 	bl eval
 	bvs 999f			/* Give up if there's an error. */
-	mov r0, r2
+	mov x0, x2
 	bl cdr
-	mov r2, r0
+	mov x2, x0
 	b 10b
 
 980:	ERRSET errbadlistexpr
 	b 999f
 
 990:	ERRCLR
-999:	pop { r0-r2, r8-r9, pc }
+999:	pop { x0-x2, x8-x9, pc }
 
 	ENDPROC
 
@@ -3087,54 +2558,54 @@ greeting:
 	           (cons (car params) (car vals))
 	           (pairlis (cdr params) (cdr vals) env))))))
   
-	Given a list of parameters in r0, a list of values in r5, and an environment to
-	extend in r9, bind each parameter to a value then extend r9.
+	Given a list of parameters in x0, a list of values in x5, and an environment to
+	extend in x9, bind each parameter to a value then extend x9.
 
 	*/
 
 	PROC pairlis
 
-	push { r0-r3, lr }
+	push { x0-x3, lr }
 
-	mov r3, r0			/* List of parameters. */
+	mov x3, x0			/* List of parameters. */
 
-5:	cmp r3, #NIL			/* Are parameters and values empty? */
+5:	cmp x3, #NIL			/* Are parameters and values empty? */
 	bne 20f
-	cmp r5, #NIL
+	cmp x5, #NIL
 	beq 990f
 
-10:	cmp r3, #NIL
+10:	cmp x3, #NIL
 	bne 20f
 	ERRSET errargextra
 	b 999f
 
-20:	cmp r5, #NIL
+20:	cmp x5, #NIL
 	bne 30f
 	ERRSET errargmissing
 	b 999f
 
-30:	mov r0, r3
+30:	mov x0, x3
 	bl car
-	mov r1, r0
-	mov r0, r5
+	mov x1, x0
+	mov x0, x5
 	bl car
-	mov r2, r0
+	mov x2, x0
 	bl cons
-	mov r1, r0
-	mov r2, r9
+	mov x1, x0
+	mov x2, x9
 	bl cons
-	mov r9, r0
-	mov r0, r3
+	mov x9, x0
+	mov x0, x3
 	bl cdr
-	mov r3, r0
-	mov r0, r5
+	mov x3, x0
+	mov x0, x5
 	bl cdr
 
-	mov r5, r0
+	mov x5, x0
 	b 5b
 
 990:	ERRCLR
-999:	pop { r0-r3, pc }
+999:	pop { x0-x3, pc }
 
 	ENDPROC
 
