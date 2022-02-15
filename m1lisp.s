@@ -118,10 +118,17 @@ lispstackbottom:
 	interpreter gracefully recover from exhausted Lisp stack space.
 
 	*/
+
+.macro PUSH register
+	str \register, [sp,#-16]! 	;; Memory is plentiful, so we're better off to just go with the alignment the system wants here.
+.endm
+.macro POP register
+	ldr \register, [sp], #16
+.endm
 	
 	PROC pushlisp
 ;; --	push { x1 }	-- ;;
-;; We have to replace the push instructions with either manual saving or a macro.
+PUSH x1
 	ldr x1, =lispstackbottom
 	cmp x6, x1
 	bne 10f
@@ -131,7 +138,9 @@ lispstackbottom:
 10:	stmfd x6!, { x0 }
 	ERRCLR
 
-999:	pop { x1 }
+999:	
+;;	-- pop { x1 } -- ;;
+POP x1 
 	mov pc, lr
 	ENDPROC
 
@@ -158,7 +167,7 @@ lispstackbottom:
 	mov pc, lr
 	ENDPROC
 
-	
+/* 
 	For simplicity of implementation, a practical value for nil is 0.  We store
 	nothing useful at memory location 0.
 
@@ -217,7 +226,11 @@ freelist:
 
 	PROC initfreelist
 
-	push { x0-x2, lr }
+;; --	push { x0-x2, lr } --;;
+PUSH x0
+PUSH x1
+PUSH x2
+PUSH x29 ; link register, I think, is x29
 	ldr x0, =cells
 	ldr x1, =freelist		/* Free list starts at the beginning */
 	str x0, [ x1 ]			/* of the cell pool. */
@@ -231,7 +244,12 @@ freelist:
 	cmp x0, x2
 	bne 1b
 
-	pop { x0-x2, pc }
+
+;; --	pop { x0-x2, pc } -- ;;
+POP x29 ; stacks are LIFO
+POP x2
+POP x1
+POP x0  ; We can't write the program counter in ARM64
 
 	ENDPROC
 
@@ -279,7 +297,10 @@ freelist:
 
 	PROC collectgarbage
 
-	push { x0, x6, lr }
+;; --	push { x0, x6, lr } -- ;;
+PUSH x0
+PUSH x6
+PUSH x29
 
 	/* Mark the root set. */
 	mov x0, x9			/* The environment. */
@@ -303,7 +324,10 @@ freelist:
 	b 10b
 
 20:	bl sweep
-	pop { x0, x6, pc }
+;; --	pop { x0, x6, pc } --;;
+POP x29
+POP x6
+POP x0
 
 	ENDPROC
 
@@ -315,8 +339,12 @@ freelist:
 
 	PROC mark
 
-	push { x0-x3, lr }
-
+;; --	push { x0-x3, lr } -- ;;
+PUSH x0
+PUSH x1
+PUSH x2
+PUSH x3
+PUSH x29
 	/* Does x0 point to a cell? */
 1:	cmp x0, #NIL
 	beq 999f
@@ -340,7 +368,13 @@ freelist:
 	ldr x0, [ x3, #4 ]		/* Chase after the cdr. */
 	b 1b
 
-999:	pop { x0-x3, pc }
+999:
+;; --	pop { x0-x3, pc } -- ;;
+POP x29
+POP x3
+POP x2
+POP x1
+POP x0
 	ENDPROC
 
 	/*
@@ -352,7 +386,10 @@ freelist:
 	*/
 	PROC sweep
 
-	push { x0-x1, lr }
+;;	-- push { x0-x1, lr } -- ;;
+PUSH x0
+PUSH x1
+PUSH x29
 	ldr x1, =cells
 1:	ldr x0, [ x1 ]			/* Is the car marked? */
 	tst x0, #MARKMASK
@@ -378,8 +415,10 @@ freelist:
 	cmp x1, x0
 	bne 1b
 
-	pop { x0-x1, pc }
-
+;; --	pop { x0-x1, pc } -- ;;
+POP x29
+POP x1
+POP x0
 	ENDPROC
 
 	/*
@@ -414,7 +453,11 @@ freelist:
 
 	PROC cons
 
-	push { x3-x4, lr }
+	;; -- push { x3-x4, lr } -- ;;
+	PUSH x3
+	PUSH x4
+	PUSH x29
+
 	ldr x3, =freelist		/* Is the free list empty? */
 	ldr x0, [ x3 ]
 	cmp x0, #NIL
@@ -445,7 +488,11 @@ freelist:
 	str x1, [ x0 ]			/* Store the car and cdr. */
 	str x2, [ x0, #4 ]
 	ERRCLR
-999:	pop { x3-x4, pc }
+999:	
+;; -- pop { x3-x4, pc } -- ;;
+POP x29
+POP x4
+POP x3
 
 	ENDPROC
 
