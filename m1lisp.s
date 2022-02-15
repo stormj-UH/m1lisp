@@ -677,8 +677,14 @@ internbuffer:
 	*/
 
 	PROC intern
-
-	push { x0-x5, lr }
+PUSH x0
+PUSH x1
+PUSH x2
+PUSH x3
+PUSH x4
+PUSH x5
+PUSH x29
+;; --	push { x0-x5, lr } -- ;;
 
 	/* Search for the symbol in obarray. */
 	ldr x0, =obarray		/* Start of obarray. */
@@ -790,8 +796,14 @@ internbuffer:
 	sub x7, x0, x1
 	orr x7, x7, #SYMMASK		/* Imprint the mask. */
 
-	pop { x0-x5, pc }
-
+	;; -- pop { x0-x5, pc } -- ;;
+POP x29
+POP x5
+POP x4
+POP x3
+POP x2
+POP x1
+POP x0
 	ENDPROC
 
 	/*
@@ -950,7 +962,12 @@ dotstr:
 
 	PROC prin1
 
-	push { x0-x3, lr }
+;; --	push { x0-x3, lr } -- ;;
+PUSH x0
+PUSH x1
+PUSH x2
+PUSH x3
+PUSH x29
 
 	cmp x0, #NIL			/* Is this nil? */
 	bne 1f
@@ -998,7 +1015,13 @@ dotstr:
 	ldr x2, =RIGHTPARENSTRLEN
 	bl write
 
-999:	pop { x0-x3, pc }
+999:
+;; --	pop { x0-x3, pc } -- ;;
+POP x29
+POP x3
+POP x2
+POP x1
+POP x0
 
 	ENDPROC
 
@@ -1017,11 +1040,17 @@ eolstr:
 
 	PROC terpri
 
-	push { x1, x2, lr }
+	;; -- push { x1, x2, lr } -- ;;
+PUSH x1
+PUSH x2
+PUSH x29
 	ldr x1, =eolstr
 	ldr x2, =EOLSTRLEN
 	bl write
-	pop { x1, x2, pc }
+POP x29
+POP x2
+POP x1
+;; --	pop { x1, x2, pc }  -- ;;
 
 	ENDPROC
 
@@ -1033,10 +1062,12 @@ eolstr:
 
 	PROC print
 
-	push { lr }
+	;; -- push { lr } -- ;;
+PUSH x29
 	bl prin1
 	bl terpri
-	pop { pc }
+POP x29
+;; --	pop { pc } -- ;;
 
 	ENDPROC
 
@@ -1070,16 +1101,33 @@ eolstr:
 	from in x1 and the length of the buffer in x2.
 
 	*/
-
+/*
 	PROC write
 
 	push { x0, x7, lr }
-	mov x7, #4			/* sys_write */
-	mov x0, #1			/* stdout */
+	mov x7, #4			sys_write
+	mov x0, #1			stdout 
 	svc #0
 	pop { x0, x7, pc }
 
 	ENDPROC
+*/
+
+	PROC write		
+
+	PUSH x0
+	PUSH x7
+	PUSH x29
+
+;; Consider putting an #IFDEF ____APPLE_____ here and leaving the linux routine
+
+	mov x0, #1	;	stdout
+  ;  There is already a pointer in x1 and a length in x2 when this function is called.
+    mov x16, #4 ; 	sys_write
+    svc 0
+	POP x29
+	POP x7
+	POP x0
 
 	/*
 	________________________________________________________________________________
