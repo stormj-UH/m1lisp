@@ -6,25 +6,81 @@
 ; Subsequent commits from 6907611fadb3e6dd2bd405a664d3f8275912e6f5 onward are
 ; (c) 2022 Jon-Erik G. Storm, LGPL2 licensed
 
+; The original used a MRS/MSR call to adjust the flags register to pass information.
+; We are going to use x28 for that purpose. 
+; There is no PUSH/POP on ARM64, so we made macros to handle 16-byte aligned addresses.
+; This program is already tiny, so it's a reasonable use of memory.
+;	
+; I also want to use less assembler hacks when defining symbols for readability and portability
+;
+; I. Headers & Globals
+;  *A.	Architecture 
+;   B.	Alignment
+;	C. 	Macros
+;		* 1.  PROC
+;		* 2.  ENDPROC
+;		* 3.  ERRSET
+;		* 4.  ERRCLR
+;		* 5.  ZSET
+;		* 6.  ZCLR
+;	   ** 7.  PUSH
+;	   ** 8.  POP
+;	D.	Lisp Stack
+;	E.	Global Procedures
+;		1. pushlisp
+;		2. poplisp
+;	F.	Definition of NIL
+; II. Garbage Collector
+;	A.	Cells Memory
+;	B.	Freelist Memory
+;.	C.	Procedures
+;		1. Initfreelist
+;		2. Collect Garbage
+;		3. Mark
+;		4. Sweep
+; III. Cons
+; IV. Object Array Memory
+; V.  Interpeter
+;	A.  Symbol Macro & Symbol Table
+;	B.  Intern
+;	C.  I/O
+;		1.  prin1
+;		2.	print
+;		3.	write
+;		4.	LOOK macro
+;		5.  getchar
+;		6.  issym
+;		7.  iswhite
+;		8.  skipwhite
+;		9.  read
+;		10.  read1
+;		11.  readcell
+;		12.	 readsym
+;	D. _start entry point
+;		1.  _start		
+;			a. print greeting 
+;		2. finish
+;		3. panic
+;	E.	REPL
+;		1.  atom
+;		2.  car  alias: first
+;		3.  cdr  alias: rest
+;		4.  assoc
+;		5.  isdef
+;		6.	defsym
+;		7.  MATCHFORM
+;		8.  ARG1
+;		9.  ARG2
+;		10.  selfeval?  (changed from selfevalp)
+;		11.  eval
+;		12.  evalcond
+;		13.  evlis
+;		14.  apply
+;		15.  pairlis
+;
+
 .arch ARMv8.4
 .p2align 2	; 	Everything needs to be aligned on 32-bits/4 bytes
-
-
-	/*
-	________________________________________________________________________________
-
-	Procedures in Assembly
-
-	These assembler macros tell the assembler, the debugger, and us where a
-	procedure starts and ends.  They also make sure that the assembler aligns
-	instructions properly and places constant values that our procedure refers to in
-	a place that the procedure can reach.
-
-	Reference
-
-	https://community.arm.com/docs/DOC-9652
-
-	*/
 
 	.macro PROC name
 	.text
@@ -88,6 +144,13 @@
 	xor x28, x28, #1<<30
 	.endm
 
+.macro PUSH register
+	str \register, [sp,#-16]! 	;; Memory is plentiful, so we're better off to just go with the alignment the system wants here.
+.endm
+.macro POP register
+	ldr \register, [sp], #16
+.endm
+
 	/*
 	________________________________________________________________________________
 
@@ -118,13 +181,6 @@ lispstackbottom:
 	interpreter gracefully recover from exhausted Lisp stack space.
 
 	*/
-
-.macro PUSH register
-	str \register, [sp,#-16]! 	;; Memory is plentiful, so we're better off to just go with the alignment the system wants here.
-.endm
-.macro POP register
-	ldr \register, [sp], #16
-.endm
 	
 	PROC pushlisp
 ;; --	push { x1 }	-- ;;
@@ -1550,8 +1606,9 @@ greeting:
 	*/
 
 	PROC finish
-
-	mov x7, #1			/* sys_exit */
+;; This is the same on MacOS except we need x16 instead of x7
+;; --	mov x7, #1			/* sys_exit */ -- ;;
+	mov x16, #1		;; JS
 	mov x0, #0			/* Exit status. */
 	svc #0				/* Call the system. */
 
