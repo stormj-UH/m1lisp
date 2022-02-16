@@ -78,20 +78,26 @@
 ;		14.  apply
 ;		15.  pairlis
 ;
+;
+;
+; blvc and maybe some other branch instructions are not recognized.
+; .func directive not recognized
+; 
 
-.arch ARMv8.4
+
+.arch ARM64
 .p2align 2	; 	Everything needs to be aligned on 32-bits/4 bytes
 
 	.macro PROC name
 	.text
 	.balign 4
-	.func \name, \name
-\name\():
+;	.func \name, \name
+;\name\():
 	.endm
 
 	.macro ENDPROC
 	.pool
-	.endfunc
+;	.endfunc
 	.endm
 
 	/*
@@ -120,7 +126,7 @@
 
 	.macro ERRCLR
 ;; --	msr apsr_nzcvq, #0 --
-	xor x28, x28, #1<<28	
+	eor x28, x28, #1<<28	
 	.endm
 
 	/*
@@ -141,7 +147,7 @@
 	
 	.macro ZCLR
 ;; --	msr apsr_nzcvq, #0 --;;
-	xor x28, x28, #1<<30
+	eor x28, x28, #1<<30
 	.endm
 
 .macro PUSH register
@@ -1278,8 +1284,13 @@ lookbuffer:
 	*/
 
 	PROC getchar
+PUSH x0
+PUSH x1
+PUSH x2
+PUSH x7
+PUSH x29
 
-	push { x0-x2, x7, lr }
+;; --	push { x0-x2, x7, lr } -- ;;
 	ldr x1, =lookbuffer
 	mov x2, #1
 	mov x7, #3			/* sys_read */
@@ -1288,7 +1299,12 @@ lookbuffer:
 	cmp x0, #0			/* End of file? */
 	moveq x0, #EOT
 	streq x0, [ x1 ]
-	pop { x0-x2, x7, pc }
+POP x29
+POP x7
+POP x2
+POP x1
+POP x0
+;; --	pop { x0-x2, x7, pc } -- ;;
 
 	ENDPROC
 
@@ -1309,7 +1325,8 @@ lookbuffer:
 	*/
 
 	PROC issym
-	push { lr }
+PUSH x29
+;; --	push { lr } -- ;;
 	cmp x0, #'('
 	beq 20f
 	cmp x0, #')'
@@ -1327,7 +1344,9 @@ lookbuffer:
 	
 20:	ZCLR				/* Not valid. */
 
-999:	pop { pc }
+999:	
+;; -- pop { pc } -- ;;
+POP x29
 	ENDPROC
 
 
@@ -1338,13 +1357,16 @@ lookbuffer:
 
 	*/
 	PROC iswhite
-	push { lr }
+PUSH x29
+;; --	push { lr } -- ;;
 	cmp x0, #' '
 	beq 999f
 	cmp x0, #'\t'
 	beq 999f
 	cmp x0, #'\n'
-999:	pop { pc }
+999:
+;; -- pop { pc } -- ;;
+POP x29
 	ENDPROC
 
 	/*
